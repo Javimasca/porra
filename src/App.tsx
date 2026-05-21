@@ -175,7 +175,7 @@ function App() {
     matches: {} as Record<string, MatchPrediction>,
   })
   const publicParticipant = participants.find(
-    (participant) => participant.accessCode.toUpperCase() === publicForm.accessCode.trim().toUpperCase(),
+    (participant) => normalizeAccessCode(participant.accessCode) === normalizeAccessCode(publicForm.accessCode),
   )
   const publicFormErrors = validatePublicForm(publicForm, publicParticipant)
   const publicParticipantPrediction = publicParticipant
@@ -442,6 +442,10 @@ function App() {
                     Tu código de acceso
                     <input
                       autoFocus
+                      autoCapitalize="none"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck={false}
                       onChange={(event) => setPublicForm((form) => ({ ...form, accessCode: event.target.value }))}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' && publicParticipant) {
@@ -2266,6 +2270,14 @@ function createAccessCode(name: string) {
   const normalizedName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
   const suffix = Math.floor(1000 + Math.random() * 9000).toString()
   return `${normalizedName}${suffix}`
+}
+
+function normalizeAccessCode(accessCode: string) {
+  return accessCode
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s-]/g, '')
+    .toUpperCase()
 }
 
 function normalizeParticipantAccessCode(participant: Participant): Participant {
