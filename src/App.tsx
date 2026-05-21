@@ -154,6 +154,11 @@ function App() {
   const [activeKnockoutStage, setActiveKnockoutStage] = useState<(typeof knockoutStages)[number]>('Ronda de 32')
   const [matchPredictions, setMatchPredictions] = useState<Record<string, MatchPrediction>>({})
   const [knockoutPredictions, setKnockoutPredictions] = useState<Record<string, MatchPrediction>>({})
+  const [publicFormStep, setPublicFormStep] = useState<'code-input' | 'form' | 'confirmation'>('code-input')
+  const [publicFormConfirmation, setPublicFormConfirmation] = useState<{
+    participantName: string
+    timestamp: Date
+  } | null>(null)
   const [publicForm, setPublicForm] = useState({
     accessCode: '',
     name: '',
@@ -172,6 +177,9 @@ function App() {
     (participant) => participant.accessCode.toUpperCase() === publicForm.accessCode.trim().toUpperCase(),
   )
   const publicFormErrors = validatePublicForm(publicForm, publicParticipant)
+  const publicParticipantPrediction = publicParticipant
+    ? predictions.find((p) => p.participantId === publicParticipant.id)
+    : undefined
   const [predictionMeta, setPredictionMeta] = useState({
     champion: '',
     topScorer: '',
@@ -392,218 +400,375 @@ function App() {
           <section>
             <header className="section-header">
               <div>
-                <p className="eyebrow">Alta publica</p>
-                <h2>Formulario de la porra</h2>
+                <p className="eyebrow">Envía tu porra</p>
+                <h2>Predicción del Mundial 2026</h2>
               </div>
-              <button
-                className="primary-action"
-                disabled={publicFormErrors.length > 0}
-                onClick={() => {
-                  if (!publicParticipant) {
-                    return
-                  }
-
-                  const participantId = publicParticipant.id
-                  const displayName = publicForm.alias.trim() || publicParticipant.name
-                  const matches = Object.values(publicForm.matches).filter(
-                    (prediction) =>
-                      Number.isFinite(prediction.homeScore) && Number.isFinite(prediction.awayScore),
-                  )
-
-                  setParticipants((current) =>
-                    current.map((participant) =>
-                      participant.id === participantId ? { ...participant, name: displayName } : participant,
-                    ),
-                  )
-                  setPredictions((current) => {
-                    const nextPrediction = {
-                      participantId,
-                      locked: true,
-                      champion: publicForm.champion,
-                      semifinalists: publicForm.semifinalists,
-                      topScorer: publicForm.topScorer,
-                      mvp: publicForm.mvp,
-                      groupWinners: publicForm.groupWinners,
-                      groupQualified: publicForm.groupQualified,
-                      bestThirds: publicForm.bestThirds,
-                      matches,
-                    }
-
-                    return current.some((prediction) => prediction.participantId === participantId)
-                      ? current.map((prediction) =>
-                          prediction.participantId === participantId ? nextPrediction : prediction,
-                        )
-                      : [...current, nextPrediction]
-                  })
-                  setPublicForm({
-                    accessCode: '',
-                    name: '',
-                    contact: '',
-                    alias: '',
-                    champion: '',
-                    topScorer: '',
-                    mvp: '',
-                    semifinalists: [],
-                    groupWinners: {},
-                    groupQualified: {},
-                    bestThirds: [],
-                    matches: {},
-                  })
-                }}
-                type="button"
-              >
-                Enviar prediccion
-              </button>
             </header>
-            <div className="form-intake">
-              {publicFormErrors.length > 0 && (
-                <div className="validation-panel">
-                  <strong>Faltan datos para enviar</strong>
-                  <ul>
-                    {publicFormErrors.map((error) => (
-                      <li key={error}>{error}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <div className="meta-card">
-                <h3>Datos del participante</h3>
-                <div className="meta-grid">
+
+            {publicFormStep === 'code-input' && (
+              <div className="form-intake">
+                <div className="meta-card public-form-welcome">
+                  <h3>¿Ya tienes código de acceso?</h3>
+                  <p className="form-description">Introdúcelo para ver o enviar tu predicción</p>
                   <label>
-                    Codigo de acceso
+                    Tu código de acceso
                     <input
+                      autoFocus
                       onChange={(event) => setPublicForm((form) => ({ ...form, accessCode: event.target.value }))}
-                      placeholder="Javier2086"
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && publicParticipant) {
+                          setPublicFormStep('form')
+                        }
+                      }}
+                      placeholder="Ej: Javier2086"
                       value={publicForm.accessCode}
                     />
                   </label>
-                  <label>
-                    Nombre
-                    <input
-                      disabled
-                      placeholder="Se carga con el codigo"
-                      value={publicParticipant?.name ?? ''}
-                    />
-                  </label>
-                  <label>
-                    Alias en ranking
-                    <input
-                      onChange={(event) => setPublicForm((form) => ({ ...form, alias: event.target.value }))}
-                      placeholder="Nombre publico"
-                      value={publicForm.alias}
-                    />
-                  </label>
+                  {publicParticipant ? (
+                    <button
+                      className="primary-action"
+                      onClick={() => {
+                        setPublicFormStep('form')
+                      }}
+                      style={{ marginTop: '16px' }}
+                      type="button"
+                    >
+                      Continuar
+                    </button>
+                  ) : publicForm.accessCode.trim() ? (
+                    <div className="validation-panel" style={{ marginTop: '16px' }}>
+                      <strong>Código no encontrado</strong>
+                      <p>Verifica que el código sea correcto e intenta de nuevo</p>
+                    </div>
+                  ) : null}
                 </div>
               </div>
-              <div className="meta-card">
-                <h3>Prediccion pre-torneo</h3>
-                <div className="meta-grid">
-                  <TeamSelect
-                    label="Campeon"
-                    onChange={(value) => setPublicForm((form) => ({ ...form, champion: value }))}
-                    teams={allTeams}
-                    value={publicForm.champion}
-                  />
-                  <label>
-                    Maximo goleador
-                    <input
-                      onChange={(event) => setPublicForm((form) => ({ ...form, topScorer: event.target.value }))}
-                      placeholder="Nombre del jugador"
-                      value={publicForm.topScorer}
-                    />
-                  </label>
-                  <label>
-                    MVP
-                    <input
-                      onChange={(event) => setPublicForm((form) => ({ ...form, mvp: event.target.value }))}
-                      placeholder="Nombre del jugador"
-                      value={publicForm.mvp}
-                    />
-                  </label>
-                </div>
-                <MultiTeamPicker
-                  label="Semifinalistas"
-                  limit={4}
-                  onChange={(teams) => setPublicForm((form) => ({ ...form, semifinalists: teams }))}
-                  selected={publicForm.semifinalists}
-                  teams={allTeams}
-                />
-                <MultiTeamPicker
-                  label="Mejores terceros"
-                  limit={8}
-                  onChange={(teams) => setPublicForm((form) => ({ ...form, bestThirds: teams }))}
-                  selected={publicForm.bestThirds}
-                  teams={allTeams}
-                />
-              </div>
-              <div className="meta-card">
-                <h3>Clasificados por grupo</h3>
-                <div className="group-picks-grid">
-                  {groups.map((group) => {
-                    const groupTeams = teamsForGroup(tournamentState.matches, group)
-                    return (
-                      <div className="group-pick" key={group}>
-                        <h4>Grupo {group}</h4>
-                        <TeamSelect
-                          label="Primero"
-                          onChange={(value) =>
-                            setPublicForm((form) => ({
-                              ...form,
-                              groupWinners: { ...form.groupWinners, [group]: value },
-                            }))
-                          }
-                          teams={groupTeams}
-                          value={publicForm.groupWinners[group] ?? ''}
-                        />
-                        <MultiTeamPicker
-                          label="Clasificados"
-                          limit={3}
-                          onChange={(teams) =>
-                            setPublicForm((form) => ({
-                              ...form,
-                              groupQualified: { ...form.groupQualified, [group]: teams },
-                            }))
-                          }
-                          selected={publicForm.groupQualified[group] ?? []}
-                          teams={groupTeams}
-                        />
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-              <div className="prediction-board">
-                {groups.map((group) => (
-                  <PredictionGroup
-                    group={group}
-                    key={group}
-                    matches={tournamentState.matches.filter((match) => match.group === group)}
-                    onChange={(matchId, side, value) => {
-                      const parsedValue = value === '' ? Number.NaN : Number(value)
-                      setPublicForm((form) => {
-                        const previous = form.matches[matchId] ?? {
-                          matchId,
-                          homeScore: Number.NaN,
-                          awayScore: Number.NaN,
-                        }
+            )}
 
-                        return {
-                          ...form,
-                          matches: {
-                            ...form.matches,
-                            [matchId]: {
-                              ...previous,
-                              [side]: parsedValue,
-                            },
-                          },
-                        }
-                      })
-                    }}
-                    predictions={publicForm.matches}
-                  />
-                ))}
+            {publicFormStep === 'form' && publicParticipant && (
+              <div className="form-intake">
+                {publicFormConfirmation && (
+                  <div className="success-panel">
+                    <strong>✓ Predicción enviada correctamente</strong>
+                    <p>
+                      Hola <strong>{publicFormConfirmation.participantName}</strong>, tu porra ha sido registrada.
+                    </p>
+                  </div>
+                )}
+
+                {!publicParticipantPrediction ? (
+                  <>
+                    <div className="meta-card public-form-greeting">
+                      <div className="greeting-content">
+                        <p className="eyebrow">Bienvenido</p>
+                        <h3>Hola, {publicParticipant.name}</h3>
+                        <p className="form-description">
+                          Rellena tus predicciones para la porra del Mundial 2026. Una vez enviadas, no podrás
+                          editarlas.
+                        </p>
+                      </div>
+                      <div className="greeting-actions">
+                        <button
+                          className="secondary-action"
+                          onClick={() => {
+                            setPublicForm({
+                              accessCode: '',
+                              name: '',
+                              contact: '',
+                              alias: '',
+                              champion: '',
+                              topScorer: '',
+                              mvp: '',
+                              semifinalists: [],
+                              groupWinners: {},
+                              groupQualified: {},
+                              bestThirds: [],
+                              matches: {},
+                            })
+                            setPublicFormStep('code-input')
+                          }}
+                          type="button"
+                        >
+                          ← Usar otro código
+                        </button>
+                      </div>
+                    </div>
+
+                    {publicFormErrors.length > 0 && (
+                      <div className="validation-panel">
+                        <strong>Completa todos los campos obligatorios</strong>
+                        <ul>
+                          {publicFormErrors.map((error) => (
+                            <li key={error}>{error}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="meta-card">
+                      <h3>Tu nombre en la clasificación</h3>
+                      <label>
+                        Alias en ranking (opcional)
+                        <input
+                          onChange={(event) =>
+                            setPublicForm((form) => ({ ...form, alias: event.target.value }))
+                          }
+                          placeholder={`Aparecerás como: ${publicForm.alias.trim() || publicParticipant.name}`}
+                          value={publicForm.alias}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="meta-card">
+                      <h3>Predicción pre-torneo</h3>
+                      <div className="meta-grid">
+                        <TeamSelect
+                          label="Campeón"
+                          onChange={(value) => setPublicForm((form) => ({ ...form, champion: value }))}
+                          teams={allTeams}
+                          value={publicForm.champion}
+                        />
+                        <label>
+                          Máximo goleador
+                          <input
+                            onChange={(event) =>
+                              setPublicForm((form) => ({ ...form, topScorer: event.target.value }))
+                            }
+                            placeholder="Nombre del jugador"
+                            value={publicForm.topScorer}
+                          />
+                        </label>
+                        <label>
+                          MVP del torneo
+                          <input
+                            onChange={(event) =>
+                              setPublicForm((form) => ({ ...form, mvp: event.target.value }))
+                            }
+                            placeholder="Nombre del jugador"
+                            value={publicForm.mvp}
+                          />
+                        </label>
+                      </div>
+                      <MultiTeamPicker
+                        label="Semifinalistas (4 equipos)"
+                        limit={4}
+                        onChange={(teams) => setPublicForm((form) => ({ ...form, semifinalists: teams }))}
+                        selected={publicForm.semifinalists}
+                        teams={allTeams}
+                      />
+                      <MultiTeamPicker
+                        label="Mejores terceros (8 equipos)"
+                        limit={8}
+                        onChange={(teams) => setPublicForm((form) => ({ ...form, bestThirds: teams }))}
+                        selected={publicForm.bestThirds}
+                        teams={allTeams}
+                      />
+                    </div>
+
+                    <div className="meta-card">
+                      <h3>Clasificados por grupo</h3>
+                      <p className="form-description">Selecciona quién crees que ganará cada grupo</p>
+                      <div className="group-picks-grid">
+                        {groups.map((group) => {
+                          const groupTeams = teamsForGroup(tournamentState.matches, group)
+                          return (
+                            <div className="group-pick" key={group}>
+                              <h4>Grupo {group}</h4>
+                              <TeamSelect
+                                label="Primero"
+                                onChange={(value) =>
+                                  setPublicForm((form) => ({
+                                    ...form,
+                                    groupWinners: { ...form.groupWinners, [group]: value },
+                                  }))
+                                }
+                                teams={groupTeams}
+                                value={publicForm.groupWinners[group] ?? ''}
+                              />
+                              <MultiTeamPicker
+                                label="Clasificados"
+                                limit={3}
+                                onChange={(teams) =>
+                                  setPublicForm((form) => ({
+                                    ...form,
+                                    groupQualified: { ...form.groupQualified, [group]: teams },
+                                  }))
+                                }
+                                selected={publicForm.groupQualified[group] ?? []}
+                                teams={groupTeams}
+                              />
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="meta-card">
+                      <h3>Resultados de la fase de grupos</h3>
+                      <p className="form-description">Predice el resultado de los 104 partidos</p>
+                      <div className="prediction-board">
+                        {groups.map((group) => (
+                          <PredictionGroup
+                            group={group}
+                            key={group}
+                            matches={tournamentState.matches.filter((match) => match.group === group)}
+                            onChange={(matchId, side, value) => {
+                              const parsedValue = value === '' ? Number.NaN : Number(value)
+                              setPublicForm((form) => {
+                                const previous = form.matches[matchId] ?? {
+                                  matchId,
+                                  homeScore: Number.NaN,
+                                  awayScore: Number.NaN,
+                                }
+
+                                return {
+                                  ...form,
+                                  matches: {
+                                    ...form.matches,
+                                    [matchId]: {
+                                      ...previous,
+                                      [side]: parsedValue,
+                                    },
+                                  },
+                                }
+                              })
+                            }}
+                            predictions={publicForm.matches}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="form-actions">
+                      <button
+                        className="primary-action"
+                        disabled={publicFormErrors.length > 0}
+                        onClick={() => {
+                          const participantId = publicParticipant.id
+                          const displayName = publicForm.alias.trim() || publicParticipant.name
+                          const matches = Object.values(publicForm.matches).filter(
+                            (prediction) =>
+                              Number.isFinite(prediction.homeScore) && Number.isFinite(prediction.awayScore),
+                          )
+
+                          setParticipants((current) =>
+                            current.map((participant) =>
+                              participant.id === participantId
+                                ? { ...participant, name: displayName }
+                                : participant,
+                            ),
+                          )
+                          setPredictions((current) => {
+                            const nextPrediction = {
+                              participantId,
+                              locked: true,
+                              champion: publicForm.champion,
+                              semifinalists: publicForm.semifinalists,
+                              topScorer: publicForm.topScorer,
+                              mvp: publicForm.mvp,
+                              groupWinners: publicForm.groupWinners,
+                              groupQualified: publicForm.groupQualified,
+                              bestThirds: publicForm.bestThirds,
+                              matches,
+                            }
+
+                            return current.some((prediction) => prediction.participantId === participantId)
+                              ? current.map((prediction) =>
+                                  prediction.participantId === participantId ? nextPrediction : prediction,
+                                )
+                              : [...current, nextPrediction]
+                          })
+
+                          setPublicFormConfirmation({
+                            participantName: displayName,
+                            timestamp: new Date(),
+                          })
+
+                          setPublicForm({
+                            accessCode: '',
+                            name: '',
+                            contact: '',
+                            alias: '',
+                            champion: '',
+                            topScorer: '',
+                            mvp: '',
+                            semifinalists: [],
+                            groupWinners: {},
+                            groupQualified: {},
+                            bestThirds: [],
+                            matches: {},
+                          })
+                          setPublicFormStep('code-input')
+                        }}
+                        type="button"
+                      >
+                        Enviar mi predicción
+                      </button>
+                      <button
+                        className="secondary-action"
+                        onClick={() => {
+                          setPublicForm({
+                            accessCode: '',
+                            name: '',
+                            contact: '',
+                            alias: '',
+                            champion: '',
+                            topScorer: '',
+                            mvp: '',
+                            semifinalists: [],
+                            groupWinners: {},
+                            groupQualified: {},
+                            bestThirds: [],
+                            matches: {},
+                          })
+                          setPublicFormStep('code-input')
+                        }}
+                        type="button"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="meta-card public-form-greeting">
+                    <div className="greeting-content">
+                      <p className="eyebrow">Predicción enviada</p>
+                      <h3>Tu porra ya está registrada, {publicParticipant.name}</h3>
+                      <p className="form-description">
+                        {publicParticipantPrediction.locked
+                          ? 'Tu predicción está bloqueada y no puede ser modificada.'
+                          : 'Tu predicción está pendiente de revisión.'}
+                      </p>
+                    </div>
+                    <div className="greeting-actions">
+                      <button
+                        className="secondary-action"
+                        onClick={() => {
+                          setPublicForm({
+                            accessCode: '',
+                            name: '',
+                            contact: '',
+                            alias: '',
+                            champion: '',
+                            topScorer: '',
+                            mvp: '',
+                            semifinalists: [],
+                            groupWinners: {},
+                            groupQualified: {},
+                            bestThirds: [],
+                            matches: {},
+                          })
+                          setPublicFormStep('code-input')
+                        }}
+                        type="button"
+                      >
+                        ← Enviar otra predicción
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
           </section>
         )}
 
