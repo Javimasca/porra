@@ -215,15 +215,15 @@ function App() {
           tournamentResponse.json(),
         ])
 
-        if (Array.isArray(apiParticipants) && apiParticipants.length > 0) {
+        if (Array.isArray(apiParticipants)) {
           setParticipants(apiParticipants.map(normalizeParticipantAccessCode))
         }
 
-        if (Array.isArray(apiPredictions) && apiPredictions.length > 0) {
+        if (Array.isArray(apiPredictions)) {
           setPredictions(apiPredictions)
         }
 
-        if (Array.isArray(apiTournament.matches) && apiTournament.matches.length > 0) {
+        if (Array.isArray(apiTournament.matches)) {
           setTournamentState({
             ...initialTournamentState,
             matches: apiTournament.matches.map((match: Match) => ({
