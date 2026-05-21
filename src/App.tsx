@@ -476,7 +476,7 @@ function App() {
                     Codigo de acceso
                     <input
                       onChange={(event) => setPublicForm((form) => ({ ...form, accessCode: event.target.value }))}
-                      placeholder="PORRA-XXXX"
+                      placeholder="Javier2086"
                       value={publicForm.accessCode}
                     />
                   </label>
@@ -1893,14 +1893,15 @@ function demoResult(index: number, seed: number) {
 }
 
 function createAccessCode(name: string) {
-  const prefix = name
+  const firstName = name
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .slice(0, 4)
-    .toUpperCase()
-    .padEnd(4, 'X')
-  return `PORRA-${prefix}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+    .replace(/[^a-zA-Z0-9\s]/g, '')
+    .trim()
+    .split(/\s+/)[0] ?? 'Jugador'
+  const normalizedName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
+  const suffix = Math.floor(1000 + Math.random() * 9000).toString()
+  return `${normalizedName}${suffix}`
 }
 
 function syncApi(path: string, body: unknown) {

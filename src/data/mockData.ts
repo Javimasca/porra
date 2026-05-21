@@ -1,9 +1,9 @@
 import type { Match, Participant, PredictionSlip, TournamentState } from '../domain/types'
 
 export const participants: Participant[] = [
-  { id: 'p1', name: 'Ana Martin', contact: 'ana@example.com', accessCode: 'PORRA-ANA1', status: 'validado' },
-  { id: 'p2', name: 'Carlos Ruiz', contact: 'carlos@example.com', accessCode: 'PORRA-CAR2', status: 'validado' },
-  { id: 'p3', name: 'Lucia Vega', contact: 'lucia@example.com', accessCode: 'PORRA-LUC3', status: 'pendiente' },
+  { id: 'p1', name: 'Ana Martin', contact: 'ana@example.com', accessCode: 'Ana4821', status: 'validado' },
+  { id: 'p2', name: 'Carlos Ruiz', contact: 'carlos@example.com', accessCode: 'Carlos7394', status: 'validado' },
+  { id: 'p3', name: 'Lucia Vega', contact: 'lucia@example.com', accessCode: 'Lucia2086', status: 'pendiente' },
 ]
 
 function groupMatch(
