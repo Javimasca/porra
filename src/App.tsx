@@ -200,9 +200,9 @@ function App() {
     async function loadFromApi() {
       try {
         const [participantsResponse, predictionsResponse, tournamentResponse] = await Promise.all([
-          fetch('/api/participants'),
-          fetch('/api/predictions'),
-          fetch('/api/tournament'),
+          fetch('/api/participants', { cache: 'no-store' }),
+          fetch('/api/predictions', { cache: 'no-store' }),
+          fetch('/api/tournament', { cache: 'no-store' }),
         ])
 
         if (!participantsResponse.ok || !predictionsResponse.ok || !tournamentResponse.ok) {
@@ -420,8 +420,8 @@ function App() {
       <section className="workspace">
         {activeTab === 'Formulario' && (
           <section>
-            <header className="section-header">
-              <div>
+            <header className="public-hero">
+              <div className="public-hero-content">
                 <p className="eyebrow">Envía tu porra</p>
                 <h2>Predicción del Mundial 2026</h2>
               </div>
@@ -2296,7 +2296,8 @@ function syncApi(path: string, body: unknown) {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  }).catch(() => {
+  }).catch((error) => {
+    console.error(`No se pudo sincronizar ${path}`, error)
     // Keep the localStorage copy as fallback while working without a database.
   })
 }

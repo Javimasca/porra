@@ -206,6 +206,58 @@ button {
   font-size: 1.8rem;
 }
 
+.public-hero {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 360px;
+  margin: -32px -32px 24px;
+  padding: 32px;
+  overflow: hidden;
+  color: #ffffff;
+  background:
+    linear-gradient(90deg, rgba(5, 12, 26, 0.88) 0%, rgba(5, 12, 26, 0.68) 42%, rgba(5, 12, 26, 0.1) 100%),
+    url('/worldcup-hero.png') center / cover no-repeat;
+}
+
+.public-hero-content {
+  display: grid;
+  gap: 12px;
+  max-width: 620px;
+}
+
+.public-hero h2 {
+  margin: 0;
+  max-width: 560px;
+  font-size: 3.5rem;
+  line-height: 1;
+}
+
+.public-hero p:not(.eyebrow) {
+  margin: 0;
+  max-width: 560px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+
+.hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.hero-badges span {
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 8px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
 .primary-action,
 .secondary-action {
   min-height: 42px;
