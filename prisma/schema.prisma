@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Participant {
+  id          String            @id @default(cuid())
+  name        String
+  contact     String
+  accessCode  String            @unique
+  status      String            @default("pendiente")
+  predictions Prediction[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model Match {
+  id              String            @id
+  group           String?
+  stage           String
+  date            DateTime?
+  venue           String?
+  home            String
+  away            String
+  homeScore       Int?
+  awayScore       Int?
+  penaltyWinner   String?
+  status          String            @default("programado")
+  matchPredictions MatchPrediction[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model Prediction {
+  id              String            @id @default(cuid())
+  participantId   String
+  participant     Participant       @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  locked          Boolean           @default(true)
+  champion        String?
+  semifinalists   Json
+  topScorer       String?
+  mvp             String?
+  groupWinners    Json
+  groupQualified  Json
+  bestThirds      Json
+  matches         MatchPrediction[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([participantId])
+}
+
+model MatchPrediction {
+  id              String      @id @default(cuid())
+  predictionId    String
+  prediction      Prediction  @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  matchId         String
+  match           Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  homeScore       Int
+  awayScore       Int
+  penaltyWinner   String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([predictionId, matchId])
+}
