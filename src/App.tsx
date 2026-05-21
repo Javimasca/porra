@@ -333,6 +333,27 @@ function App() {
     [participants, predictions, scoringTournamentState],
   )
   const visibleTabs = mode === 'publico' ? publicTabs : adminTabs
+  const enteredAccessCode = publicForm.accessCode.trim()
+  const publicCodeHasInput = enteredAccessCode.length > 0
+  const publicFormRequiredCount = publicFormErrors.length
+  const resetPublicForm = (accessCode = '') => {
+    setPublicForm({
+      accessCode,
+      name: '',
+      contact: '',
+      alias: '',
+      champion: '',
+      topScorer: '',
+      mvp: '',
+      semifinalists: [],
+      groupWinners: {},
+      groupQualified: {},
+      bestThirds: [],
+      matches: {},
+    })
+    setPublicFormConfirmation(null)
+    setPublicFormEditMode(false)
+  }
 
   return (
     <main className="app-shell">
@@ -408,9 +429,15 @@ function App() {
 
             {publicFormStep === 'code-input' && (
               <div className="form-intake">
-                <div className="meta-card public-form-welcome">
-                  <h3>¿Ya tienes código de acceso?</h3>
-                  <p className="form-description">Introdúcelo para ver o enviar tu predicción</p>
+                <div className="public-entry-panel">
+                  <div className="public-entry-copy">
+                    <p className="eyebrow">Acceso privado</p>
+                    <h3>Introduce tu código para entrar a tu porra</h3>
+                    <p>
+                      El código es personal y tiene el formato <strong>Nombre1234</strong>. Con él podrás ver si ya
+                      enviaste tu predicción o completar una nueva.
+                    </p>
+                  </div>
                   <label>
                     Tu código de acceso
                     <input
@@ -426,18 +453,28 @@ function App() {
                     />
                   </label>
                   {publicParticipant ? (
-                    <button
-                      className="primary-action"
-                      onClick={() => {
-                        setPublicFormStep('form')
-                      }}
-                      style={{ marginTop: '16px' }}
-                      type="button"
-                    >
-                      Continuar
-                    </button>
-                  ) : publicForm.accessCode.trim() ? (
-                    <div className="validation-panel" style={{ marginTop: '16px' }}>
+                    <div className="access-status access-status-ok">
+                      <div>
+                        <span>Código reconocido</span>
+                        <strong>Hola, {publicParticipant.name}</strong>
+                        <p>
+                          {publicParticipantPrediction
+                            ? 'Ya tienes una porra registrada. Puedes revisarla desde aquí.'
+                            : 'Todavía no has enviado tu porra. Puedes completarla ahora.'}
+                        </p>
+                      </div>
+                      <button
+                        className="primary-action"
+                        onClick={() => {
+                          setPublicFormStep('form')
+                        }}
+                        type="button"
+                      >
+                        {publicParticipantPrediction ? 'Ver mi porra' : 'Completar mi porra'}
+                      </button>
+                    </div>
+                  ) : publicCodeHasInput ? (
+                    <div className="access-status access-status-error">
                       <strong>Código no encontrado</strong>
                       <p>Verifica que el código sea correcto e intenta de nuevo</p>
                     </div>
@@ -470,20 +507,7 @@ function App() {
                   <button
                     className="secondary-action"
                     onClick={() => {
-                      setPublicForm({
-                        accessCode: '',
-                        name: '',
-                        contact: '',
-                        alias: '',
-                        champion: '',
-                        topScorer: '',
-                        mvp: '',
-                        semifinalists: [],
-                        groupWinners: {},
-                        groupQualified: {},
-                        bestThirds: [],
-                        matches: {},
-                      })
+                      resetPublicForm()
                       setPublicFormStep('code-input')
                     }}
                     type="button"
@@ -541,6 +565,21 @@ function App() {
                         >
                           ← Usar otro código
                         </button>
+                      </div>
+                    </div>
+
+                    <div className="public-form-status">
+                      <div>
+                        <span>Identificado como</span>
+                        <strong>{publicParticipant.name}</strong>
+                      </div>
+                      <div>
+                        <span>Estado</span>
+                        <strong>{publicParticipantPrediction ? 'Porra enviada' : 'Porra pendiente'}</strong>
+                      </div>
+                      <div>
+                        <span>Pendiente por completar</span>
+                        <strong>{publicFormRequiredCount}</strong>
                       </div>
                     </div>
 
@@ -623,7 +662,9 @@ function App() {
                           const groupTeams = teamsForGroup(tournamentState.matches, group)
                           return (
                             <div className="group-pick" key={group}>
-                              <h4>Grupo {group}</h4>
+                              <h4>
+                                Grupo <span translate="no">{group}</span>
+                              </h4>
                               <TeamSelect
                                 label="Primero"
                                 onChange={(value) =>
@@ -880,7 +921,9 @@ function App() {
                       <div className="group-picks-grid">
                         {groups.map((group) => (
                           <div className="group-pick" key={group}>
-                            <h4>Grupo {group}</h4>
+                            <h4>
+                              Grupo <span translate="no">{group}</span>
+                            </h4>
                             <p>
                               <strong>Primero:</strong>{' '}
                               {publicParticipantPrediction.groupWinners[group] ?? '—'}
@@ -1371,7 +1414,9 @@ function App() {
                     const groupTeams = teamsForGroup(tournamentState.matches, group)
                     return (
                       <div className="group-pick" key={group}>
-                        <h4>Grupo {group}</h4>
+                        <h4>
+                          Grupo <span translate="no">{group}</span>
+                        </h4>
                         <TeamSelect
                           label="Primero"
                           onChange={(value) =>
@@ -1595,7 +1640,9 @@ function App() {
             <div className="results-board">
               {groups.map((group) => (
                 <article className="results-group" key={group}>
-                  <h3>Grupo {group}</h3>
+                  <h3>
+                    Grupo <span translate="no">{group}</span>
+                  </h3>
                   {tournamentState.matches
                     .filter((match) => match.stage === 'Grupo' && match.group === group)
                     .map((match) => (
@@ -1881,7 +1928,13 @@ function GroupCard({
 
   return (
     <article className="group-card">
-      <div className={`group-letter group-${group.toLowerCase()}`}>{group}</div>
+      <div
+        aria-label={`Grupo ${group}`}
+        className={`group-letter group-${group.toLowerCase()}`}
+        translate="no"
+      >
+        {group}
+      </div>
       <div className="group-body">
         <div className="fixture-panel">
           <div className="mini-header">
@@ -1902,7 +1955,9 @@ function GroupCard({
           ))}
         </div>
         <div className="standings-panel">
-          <h3>Grupo {group}</h3>
+          <h3>
+            Grupo <span translate="no">{group}</span>
+          </h3>
           <table className="standings-table">
             <thead>
               <tr>
@@ -2309,7 +2364,9 @@ function PredictionGroup({
 }) {
   return (
     <article className="prediction-group">
-      <h3>Grupo {group}</h3>
+      <h3>
+        Grupo <span translate="no">{group}</span>
+      </h3>
       <div className="prediction-fixtures">
         {matches.map((match) => {
           const prediction = predictions[match.id]
