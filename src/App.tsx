@@ -96,10 +96,7 @@ function loadParticipants() {
   }
 
   try {
-    return (JSON.parse(savedParticipants) as Participant[]).map((participant) => ({
-      ...participant,
-      accessCode: participant.accessCode ?? createAccessCode(participant.name),
-    }))
+    return (JSON.parse(savedParticipants) as Participant[]).map(normalizeParticipantAccessCode)
   } catch {
     return initialParticipants
   }
@@ -210,7 +207,7 @@ function App() {
         ])
 
         if (Array.isArray(apiParticipants) && apiParticipants.length > 0) {
-          setParticipants(apiParticipants)
+          setParticipants(apiParticipants.map(normalizeParticipantAccessCode))
         }
 
         if (Array.isArray(apiPredictions) && apiPredictions.length > 0) {
@@ -1902,6 +1899,17 @@ function createAccessCode(name: string) {
   const normalizedName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
   const suffix = Math.floor(1000 + Math.random() * 9000).toString()
   return `${normalizedName}${suffix}`
+}
+
+function normalizeParticipantAccessCode(participant: Participant): Participant {
+  if (participant.accessCode && !participant.accessCode.toUpperCase().startsWith('PORRA')) {
+    return participant
+  }
+
+  return {
+    ...participant,
+    accessCode: createAccessCode(participant.name),
+  }
 }
 
 function syncApi(path: string, body: unknown) {
