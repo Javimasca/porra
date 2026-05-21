@@ -1122,8 +1122,6 @@ tbody tr:last-child td {
   cursor: pointer;
   accent-color: var(--primary);
 }
-  min-height: 16px;
-}
 
 .prediction-group {
   border: 1px solid #dbe1e6;
@@ -1247,6 +1245,7 @@ tbody tr:last-child td {
     font-weight: 600;
   }
 
+.success-panel {
   padding: 16px;
   border: 1px solid #86efac;
   border-radius: 12px;
