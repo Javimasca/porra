@@ -510,6 +510,14 @@ select:focus {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
+input:disabled,
+select:disabled {
+  background: var(--gray-100);
+  color: var(--gray-500);
+  cursor: not-allowed;
+}
+
+
 .inline-select {
   min-width: 140px;
   min-height: 36px;
@@ -1210,14 +1218,35 @@ tbody tr:last-child td {
   font-size: 0.9rem;
 }
 
-.muted-copy {
-  margin: 0;
-  color: #52616d;
-  line-height: 1.5;
-}
+  .review-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 
-/* Public form styles */
-.success-panel {
+  .review-badges {
+    display: grid;
+    gap: 12px;
+    margin-top: 18px;
+    padding: 16px;
+    border-radius: 12px;
+    background: var(--gray-50);
+  }
+
+  .review-badges div {
+    display: grid;
+    gap: 6px;
+  }
+
+  .review-badges strong {
+    display: block;
+    color: var(--gray-700);
+  }
+
+  .review-badges p {
+    margin: 0;
+    color: var(--gray-900);
+    font-weight: 600;
+  }
+
   padding: 16px;
   border: 1px solid #86efac;
   border-radius: 12px;
