@@ -1,7 +1,14 @@
+import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
 import { participants, tournamentState } from '../src/data/mockData'
 
-const prisma = new PrismaClient()
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL is not configured')
+}
+
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+})
 
 async function main() {
   await prisma.$transaction([
