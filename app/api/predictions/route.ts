@@ -13,6 +13,7 @@ export async function GET() {
       predictions.map((prediction) => ({
         participantId: prediction.participantId,
         locked: prediction.locked,
+        reopenRequested: prediction.reopenRequested,
         champion: prediction.champion ?? '',
         semifinalists: prediction.semifinalists,
         topScorer: prediction.topScorer ?? '',
@@ -51,6 +52,7 @@ export async function PUT(request: Request) {
       for (const prediction of predictions as Array<{
         participantId: string
         locked: boolean
+        reopenRequested?: boolean
         champion: string
         semifinalists: string[]
         topScorer: string
@@ -69,6 +71,7 @@ export async function PUT(request: Request) {
           where: { participantId: prediction.participantId },
           update: {
             locked: prediction.locked,
+            reopenRequested: prediction.reopenRequested ?? false,
             champion: prediction.champion,
             semifinalists: prediction.semifinalists,
             topScorer: prediction.topScorer,
@@ -80,6 +83,7 @@ export async function PUT(request: Request) {
           create: {
             participantId: prediction.participantId,
             locked: prediction.locked,
+            reopenRequested: prediction.reopenRequested ?? false,
             champion: prediction.champion,
             semifinalists: prediction.semifinalists,
             topScorer: prediction.topScorer,

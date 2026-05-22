@@ -306,6 +306,7 @@ function App() {
   const pendingPlayers = participants.filter((player) => player.status === 'pendiente')
   const completedMatches = tournamentState.matches.filter((match) => match.status === 'finalizado')
   const lockedPredictions = predictions.filter((prediction) => prediction.locked)
+  const reopenRequests = predictions.filter((prediction) => prediction.reopenRequested)
   const validatedParticipants = participants.filter((participant) => participant.status === 'validado')
   const qualification = useMemo(() => buildQualification(tournamentState.matches), [tournamentState.matches])
   const scoringTournamentState = useMemo(
@@ -375,6 +376,7 @@ function App() {
       const nextPrediction: PredictionSlip = {
         participantId,
         locked,
+        reopenRequested: false,
         champion: publicForm.champion,
         semifinalists: publicForm.semifinalists,
         topScorer: publicForm.topScorer,
@@ -820,6 +822,7 @@ function App() {
                             const nextPrediction = {
                               participantId,
                               locked: true,
+                              reopenRequested: false,
                               champion: publicForm.champion,
                               semifinalists: publicForm.semifinalists,
                               topScorer: publicForm.topScorer,
@@ -931,12 +934,19 @@ function App() {
                         {publicParticipantPrediction.locked && (
                           <button
                             className="secondary-action"
+                            disabled={publicParticipantPrediction.reopenRequested}
                             onClick={() => {
-                              window.alert('Tu porra ya es definitiva. Pide al administrador que la reabra si necesitas corregirla.')
+                              setPredictions((current) =>
+                                current.map((prediction) =>
+                                  prediction.participantId === publicParticipant.id
+                                    ? { ...prediction, reopenRequested: true }
+                                    : prediction,
+                                ),
+                              )
                             }}
                             type="button"
                           >
-                            Solicitar reapertura
+                            {publicParticipantPrediction.reopenRequested ? 'Reapertura solicitada' : 'Solicitar reapertura'}
                           </button>
                         )}
                         <button
@@ -1055,6 +1065,7 @@ function App() {
               <Metric label="Pagos pendientes" value={pendingPlayers.length.toString()} />
               <Metric label="Partidos cerrados" value={completedMatches.length.toString()} />
               <Metric label="Porras bloqueadas" value={lockedPredictions.length.toString()} />
+              <Metric label="Solicitudes reapertura" value={reopenRequests.length.toString()} />
             </section>
 
             <section className="content-grid">
@@ -1359,7 +1370,9 @@ function App() {
                 onToggleLocked={(locked) => {
                   setPredictions((current) =>
                     current.map((prediction) =>
-                      prediction.participantId === reviewParticipantId ? { ...prediction, locked } : prediction,
+                      prediction.participantId === reviewParticipantId
+                        ? { ...prediction, locked, reopenRequested: false }
+                        : prediction,
                     ),
                   )
                 }}
@@ -1403,6 +1416,7 @@ function App() {
                       const nextPrediction: PredictionSlip = {
                         participantId: selectedPredictionParticipantId,
                         locked: existing?.locked ?? true,
+                        reopenRequested: existing?.reopenRequested ?? false,
                         champion: predictionMeta.champion,
                         semifinalists: predictionMeta.semifinalists,
                         topScorer: predictionMeta.topScorer,
@@ -1435,7 +1449,7 @@ function App() {
                     setPredictions((current) =>
                       current.map((prediction) =>
                         prediction.participantId === selectedPredictionParticipantId
-                          ? { ...prediction, locked: !prediction.locked }
+                          ? { ...prediction, locked: !prediction.locked, reopenRequested: false }
                           : prediction,
                       ),
                     )
@@ -1467,6 +1481,10 @@ function App() {
               <div className="prediction-summary">
                 <strong>{selectedPrediction?.locked ? 'Definitiva' : selectedPrediction ? 'Borrador' : '-'}</strong>
                 <span>estado de la porra</span>
+              </div>
+              <div className="prediction-summary">
+                <strong>{selectedPrediction?.reopenRequested ? 'Solicitada' : '-'}</strong>
+                <span>reapertura</span>
               </div>
             </div>
 
@@ -1613,6 +1631,7 @@ function App() {
                     const nextPrediction: PredictionSlip = {
                       participantId: selectedKnockoutParticipantId,
                       locked: existing?.locked ?? true,
+                      reopenRequested: existing?.reopenRequested ?? false,
                       champion: existing?.champion ?? '',
                       semifinalists: existing?.semifinalists ?? [],
                       topScorer: existing?.topScorer ?? '',
@@ -2200,6 +2219,10 @@ function PredictionReview({
             <strong>{prediction.locked ? 'Definitiva' : 'Borrador'}</strong>
           </div>
           <div className="score-pill">
+            <span>Reapertura</span>
+            <strong>{prediction.reopenRequested ? 'Solicitada' : '-'}</strong>
+          </div>
+          <div className="score-pill">
             <span>Marcadores de grupo</span>
             <strong>{completedMatches}/72</strong>
           </div>
@@ -2471,6 +2494,7 @@ function seedGroupPredictions(current: PredictionSlip[], players: Participant[])
     return {
       participantId: player.id,
       locked: true,
+      reopenRequested: false,
       champion: allTeams[(offset + 1) % allTeams.length],
       semifinalists: [
         allTeams[(offset + 1) % allTeams.length],

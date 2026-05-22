@@ -34,6 +34,7 @@ export type MatchPrediction = {
 export type PredictionSlip = {
   participantId: string
   locked: boolean
+  reopenRequested?: boolean
   champion: string
   semifinalists: string[]
   topScorer: string

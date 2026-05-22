@@ -39,6 +39,7 @@ model Prediction {
   participantId   String
   participant     Participant       @relation(fields: [participantId], references: [id], onDelete: Cascade)
   locked          Boolean           @default(true)
+  reopenRequested Boolean           @default(false)
   champion        String?
   semifinalists   Json
   topScorer       String?
