@@ -150,6 +150,17 @@ button {
   gap: 8px;
 }
 
+.metric-button {
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.metric-button:hover {
+  opacity: 0.92;
+}
+
 .mode-switch {
   display: grid;
   grid-template-columns: 1fr 1fr;

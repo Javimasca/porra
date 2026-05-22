@@ -5,7 +5,7 @@ import { buildLeaderboard } from './domain/scoring'
 import type { Match, MatchPrediction, Participant, ParticipantStatus, PredictionSlip, TournamentState } from './domain/types'
 
 const publicTabs = ['Formulario', 'Cuadro', 'Clasificacion', 'Reglas'] as const
-const adminTabs = ['Panel', 'Cuadro', 'Participantes', 'Predicciones', 'Eliminatorias', 'Resultados', 'Clasificacion', 'Reglas'] as const
+const adminTabs = ['Panel', 'Solicitudes', 'Cuadro', 'Participantes', 'Predicciones', 'Eliminatorias', 'Resultados', 'Clasificacion', 'Reglas'] as const
 const tabs = [...publicTabs, ...adminTabs] as const
 type Tab = (typeof tabs)[number]
 type TeamStanding = {
@@ -1078,7 +1078,14 @@ function App() {
               <Metric label="Pagos pendientes" value={pendingPlayers.length.toString()} />
               <Metric label="Partidos cerrados" value={completedMatches.length.toString()} />
               <Metric label="Porras bloqueadas" value={lockedPredictions.length.toString()} />
-              <Metric label="Solicitudes reapertura" value={reopenRequests.length.toString()} />
+              <button
+  className="metric metric-button"
+  onClick={() => setActiveTab('Solicitudes')}
+  type="button"
+>
+  <span>Solicitudes reapertura</span>
+  <strong>{reopenRequests.length}</strong>
+</button>
             </section>
 
             <section className="content-grid">
@@ -1115,6 +1122,95 @@ function App() {
             </section>
           </>
         )}
+
+{activeTab === 'Solicitudes' && (
+  <section>
+    <header className="section-header">
+      <div>
+        <p className="eyebrow">Administracion</p>
+        <h2>Solicitudes de reapertura</h2>
+      </div>
+    </header>
+
+    {reopenRequests.length === 0 ? (
+      <div className="panel">
+        <p>No hay solicitudes pendientes.</p>
+      </div>
+    ) : (
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Participante</th>
+              <th>Estado</th>
+              <th>Solicitud</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reopenRequests.map((prediction) => {
+              const participant = participants.find(
+                (p) => p.id === prediction.participantId,
+              )
+
+              return (
+                <tr key={prediction.participantId}>
+                  <td>{participant?.name ?? 'Participante'}</td>
+                  <td>
+                    {prediction.locked ? 'Definitiva' : 'Borrador'}
+                  </td>
+                  <td>Solicitada</td>
+                  <td>
+                    <div className="row-actions">
+                      <button
+                        className="small-action"
+                        onClick={() => {
+                          setPredictions((current) =>
+                            current.map((item) =>
+                              item.participantId === prediction.participantId
+                                ? {
+                                    ...item,
+                                    locked: false,
+                                    reopenRequested: false,
+                                  }
+                                : item,
+                            ),
+                          )
+                        }}
+                        type="button"
+                      >
+                        Reabrir edicion
+                      </button>
+
+                      <button
+                        className="secondary-action"
+                        onClick={() => {
+                          setPredictions((current) =>
+                            current.map((item) =>
+                              item.participantId === prediction.participantId
+                                ? {
+                                    ...item,
+                                    reopenRequested: false,
+                                  }
+                                : item,
+                            ),
+                          )
+                        }}
+                        type="button"
+                      >
+                        Ignorar
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </section>
+)}
 
         {activeTab === 'Cuadro' && (
           <section>
