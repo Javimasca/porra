@@ -1841,14 +1841,75 @@ function App() {
               </p>
             </div>
             <div className="rules-grid">
-              <Rule title="Fase de grupos" text="Acertar el signo 1-X-2 suma 1 punto. Acertar el resultado exacto suma 3 puntos en total: 1 punto por el signo y 2 puntos extra por el marcador." />
-              <Rule title="Eliminatorias" text="Incluye la ronda de 32, octavos, cuartos, semifinales y final. Se predice el marcador tras 120 minutos y, si hay empate, el ganador por penaltis." />
+              <Rule title="Fase de grupos" text="Signo 1-X-2: 1 punto. Resultado exacto: 3 puntos en total. Acertar los 6 signos de un grupo suma 10 puntos extra por grupo." />
+              <Rule title="Eliminatorias" text="Se predice el marcador tras 120 minutos y, si hay empate, el ganador por penaltis. El signo acertado suma 2 puntos." />
               <Rule title="Bonus finales" text="Campeon: 40 puntos. Maximo goleador: 25 puntos. MVP: 25 puntos." />
               <Rule title="Premios" text="Habra premio para el 1er, 2o y 3er clasificado final. El importe de cada premio esta pendiente de confirmar." />
             </div>
             <div className="rules-table-grid">
               <article className="panel">
-                <h3>Clasificados de grupo</h3>
+                <h3>Primeros de grupo</h3>
+                <table className="rules-table">
+                  <thead>
+                    <tr>
+                      <th>Primeros acertados</th>
+                      <th>Puntos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>12</td>
+                      <td>30</td>
+                    </tr>
+                    <tr>
+                      <td>11</td>
+                      <td>26</td>
+                    </tr>
+                    <tr>
+                      <td>10</td>
+                      <td>23</td>
+                    </tr>
+                    <tr>
+                      <td>9</td>
+                      <td>21</td>
+                    </tr>
+                    <tr>
+                      <td>8</td>
+                      <td>18</td>
+                    </tr>
+                    <tr>
+                      <td>7</td>
+                      <td>15</td>
+                    </tr>
+                    <tr>
+                      <td>6</td>
+                      <td>13</td>
+                    </tr>
+                    <tr>
+                      <td>5</td>
+                      <td>11</td>
+                    </tr>
+                    <tr>
+                      <td>4</td>
+                      <td>8</td>
+                    </tr>
+                    <tr>
+                      <td>3</td>
+                      <td>5</td>
+                    </tr>
+                    <tr>
+                      <td>2</td>
+                      <td>3</td>
+                    </tr>
+                    <tr>
+                      <td>1</td>
+                      <td>1</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </article>
+              <article className="panel">
+                <h3>Clasificados y terceros</h3>
                 <table className="rules-table">
                   <thead>
                     <tr>
@@ -1858,16 +1919,78 @@ function App() {
                   </thead>
                   <tbody>
                     <tr>
-                      <td>Campeon de grupo acertado</td>
-                      <td>4 por equipo</td>
-                    </tr>
-                    <tr>
                       <td>Equipo clasificado en su grupo</td>
                       <td>2 por equipo</td>
                     </tr>
                     <tr>
                       <td>Mejor tercero acertado</td>
                       <td>2 por equipo</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </article>
+              <article className="panel">
+                <h3>Resultados exactos en eliminatorias</h3>
+                <table className="rules-table">
+                  <thead>
+                    <tr>
+                      <th>Ronda</th>
+                      <th>Puntos extra</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Ronda de 32</td>
+                      <td>4</td>
+                    </tr>
+                    <tr>
+                      <td>Octavos</td>
+                      <td>6</td>
+                    </tr>
+                    <tr>
+                      <td>Cuartos</td>
+                      <td>6</td>
+                    </tr>
+                    <tr>
+                      <td>Semifinal</td>
+                      <td>8</td>
+                    </tr>
+                    <tr>
+                      <td>Final</td>
+                      <td>10</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </article>
+              <article className="panel">
+                <h3>Bonus por signos en eliminatorias</h3>
+                <table className="rules-table">
+                  <thead>
+                    <tr>
+                      <th>Aciertos</th>
+                      <th>Puntos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Ronda de 32: 16 / 15 / 14 / 13 / 12 / 11 / 10 signos</td>
+                      <td>24 / 22 / 20 / 18 / 16 / 14 / 12</td>
+                    </tr>
+                    <tr>
+                      <td>Octavos: 8 / 7 / 6 / 5 signos</td>
+                      <td>16 / 14 / 12 / 10</td>
+                    </tr>
+                    <tr>
+                      <td>Cuartos: 4 / 3 signos</td>
+                      <td>12 / 9</td>
+                    </tr>
+                    <tr>
+                      <td>Semifinales: 2 signos</td>
+                      <td>8</td>
+                    </tr>
+                    <tr>
+                      <td>Final: signo acertado</td>
+                      <td>5</td>
                     </tr>
                   </tbody>
                 </table>

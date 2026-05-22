@@ -10,10 +10,40 @@ import type {
 
 const knockoutExactPoints: Record<string, number> = {
   'Ronda de 32': 4,
-  Octavos: 5,
+  Octavos: 6,
   Cuartos: 6,
   Semifinal: 8,
   Final: 10,
+}
+
+const groupWinnerPointsTable = [0, 1, 3, 5, 8, 11, 13, 15, 18, 21, 23, 26, 30]
+
+const knockoutSignBonusTables: Record<string, Record<number, number>> = {
+  'Ronda de 32': {
+    16: 24,
+    15: 22,
+    14: 20,
+    13: 18,
+    12: 16,
+    11: 14,
+    10: 12,
+  },
+  Octavos: {
+    8: 16,
+    7: 14,
+    6: 12,
+    5: 10,
+  },
+  Cuartos: {
+    4: 12,
+    3: 9,
+  },
+  Semifinal: {
+    2: 8,
+  },
+  Final: {
+    1: 5,
+  },
 }
 
 export function buildLeaderboard(
@@ -61,10 +91,12 @@ export function scorePrediction(prediction: PredictionSlip, state: TournamentSta
 
   return [
     { label: 'Partidos de grupo', points: groupMatchPoints },
+    { label: 'Plenos de grupo', points: scoreGroupSignPerfects(prediction, state) },
     { label: 'Primeros de grupo', points: scoreGroupWinners(prediction, state) },
     { label: 'Clasificados', points: scoreQualifiedTeams(prediction, state) },
     { label: 'Mejores terceros', points: scoreBestThirds(prediction, state) },
     { label: 'Eliminatorias', points: knockoutPoints },
+    { label: 'Bonus eliminatorias', points: scoreKnockoutSignBonuses(prediction, state) },
     { label: 'Semifinalistas', points: scoreSemifinalists(prediction, state) },
     { label: 'Campeon', points: state.champion && prediction.champion === state.champion ? 40 : 0 },
     { label: 'Goleador', points: state.topScorer && prediction.topScorer === state.topScorer ? 25 : 0 },
@@ -111,8 +143,35 @@ function sign(home: number, away: number) {
 }
 
 function scoreGroupWinners(prediction: PredictionSlip, state: TournamentState) {
-  return Object.entries(state.groupWinners).reduce((sum, [group, winner]) => {
-    return sum + (prediction.groupWinners[group] === winner ? 4 : 0)
+  const hits = Object.entries(state.groupWinners).filter(([group, winner]) => {
+    return prediction.groupWinners[group] === winner
+  }).length
+
+  return groupWinnerPointsTable[hits] ?? 0
+}
+
+function scoreGroupSignPerfects(prediction: PredictionSlip, state: TournamentState) {
+  const groupMatches = state.matches.reduce<Record<string, Match[]>>((matchesByGroup, match) => {
+    if (match.stage === 'Grupo' && match.group) {
+      matchesByGroup[match.group] = [...(matchesByGroup[match.group] ?? []), match]
+    }
+
+    return matchesByGroup
+  }, {})
+
+  return Object.values(groupMatches).reduce((sum, matches) => {
+    const groupIsComplete = matches.length === 6 && matches.every((match) => match.status === 'finalizado')
+
+    if (!groupIsComplete) {
+      return sum
+    }
+
+    const allSignsHit = matches.every((match) => {
+      const pick = prediction.matches.find((item) => item.matchId === match.id)
+      return pick ? sameSign(pick, match) : false
+    })
+
+    return sum + (allSignsHit ? 10 : 0)
   }, 0)
 }
 
@@ -126,6 +185,18 @@ function scoreQualifiedTeams(prediction: PredictionSlip, state: TournamentState)
 
 function scoreBestThirds(prediction: PredictionSlip, state: TournamentState) {
   return state.bestThirds.filter((team) => prediction.bestThirds.includes(team)).length * 2
+}
+
+function scoreKnockoutSignBonuses(prediction: PredictionSlip, state: TournamentState) {
+  return Object.entries(knockoutSignBonusTables).reduce((sum, [stage, table]) => {
+    const matches = state.matches.filter((match) => match.stage === stage && match.status === 'finalizado')
+    const hits = matches.filter((match) => {
+      const pick = prediction.matches.find((item) => item.matchId === match.id)
+      return pick ? knockoutSignPoints(pick, match) === 2 : false
+    }).length
+
+    return sum + (table[hits] ?? 0)
+  }, 0)
 }
 
 function scoreSemifinalists(prediction: PredictionSlip, state: TournamentState) {
