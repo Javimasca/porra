@@ -714,6 +714,23 @@ tbody tr:last-child td {
   margin-bottom: 0;
 }
 
+.rules-table-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.rules-table th,
+.rules-table td {
+  white-space: normal;
+}
+
+.rules-table td:last-child {
+  font-weight: 900;
+  color: #12343b;
+}
+
 .fixture-count {
   padding: 10px 14px;
   border-radius: 8px;
@@ -1532,6 +1549,7 @@ tbody tr:last-child td {
   .score-breakdown,
   .review-grid,
   .rules-grid,
+  .rules-table-grid,
   .entry-form,
   .meta-grid,
   .group-picks-grid,

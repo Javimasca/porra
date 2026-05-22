@@ -1841,11 +1841,66 @@ function App() {
               </p>
             </div>
             <div className="rules-grid">
-              <Rule title="Fase de grupos" text="Acertar el signo 1-X-2 suma 1 punto. Acertar el resultado exacto suma 3 puntos. Acertar todos los signos de un grupo suma 10 puntos extra." />
-              <Rule title="Clasificados de grupo" text="Se puntuan los primeros de grupo con una tabla progresiva, los segundos de cada grupo y los mejores terceros por equipo clasificado, sin exigir acertar el grupo exacto." />
+              <Rule title="Fase de grupos" text="Acertar el signo 1-X-2 suma 1 punto. Acertar el resultado exacto suma 3 puntos en total: 1 punto por el signo y 2 puntos extra por el marcador." />
               <Rule title="Eliminatorias" text="Incluye la ronda de 32, octavos, cuartos, semifinales y final. Se predice el marcador tras 120 minutos y, si hay empate, el ganador por penaltis." />
-              <Rule title="Bonus finales" text="Campeon: 40 puntos. Semifinalistas: 3, 8, 14 o 20 puntos segun aciertos. Maximo goleador: 25 puntos. MVP: 25 puntos." />
+              <Rule title="Bonus finales" text="Campeon: 40 puntos. Maximo goleador: 25 puntos. MVP: 25 puntos." />
               <Rule title="Premios" text="Habra premio para el 1er, 2o y 3er clasificado final. El importe de cada premio esta pendiente de confirmar." />
+            </div>
+            <div className="rules-table-grid">
+              <article className="panel">
+                <h3>Clasificados de grupo</h3>
+                <table className="rules-table">
+                  <thead>
+                    <tr>
+                      <th>Acierto</th>
+                      <th>Puntos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Campeon de grupo acertado</td>
+                      <td>4 por equipo</td>
+                    </tr>
+                    <tr>
+                      <td>Equipo clasificado en su grupo</td>
+                      <td>2 por equipo</td>
+                    </tr>
+                    <tr>
+                      <td>Mejor tercero acertado</td>
+                      <td>2 por equipo</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </article>
+              <article className="panel">
+                <h3>Bonus por semifinalistas</h3>
+                <table className="rules-table">
+                  <thead>
+                    <tr>
+                      <th>Semifinalistas acertados</th>
+                      <th>Puntos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>1 equipo</td>
+                      <td>3</td>
+                    </tr>
+                    <tr>
+                      <td>2 equipos</td>
+                      <td>8</td>
+                    </tr>
+                    <tr>
+                      <td>3 equipos</td>
+                      <td>14</td>
+                    </tr>
+                    <tr>
+                      <td>4 equipos</td>
+                      <td>20</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </article>
             </div>
           </section>
         )}
