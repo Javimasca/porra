@@ -928,6 +928,17 @@ function App() {
                             Editar predicción
                           </button>
                         )}
+                        {publicParticipantPrediction.locked && (
+                          <button
+                            className="secondary-action"
+                            onClick={() => {
+                              window.alert('Tu porra ya es definitiva. Pide al administrador que la reabra si necesitas corregirla.')
+                            }}
+                            type="button"
+                          >
+                            Solicitar reapertura
+                          </button>
+                        )}
                         <button
                           className="secondary-action"
                           onClick={() => {
