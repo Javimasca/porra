@@ -1,3 +1,41 @@
+/* Barra de pestañas móvil */
+.mobile-tabs {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-tabs {
+    display: flex;
+    position: sticky;
+    top: 56px;
+    z-index: 10;
+    background: #fff;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--gray-200);
+    padding: 0 4px;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .mobile-tab {
+    flex: 0 0 auto;
+    min-width: 110px;
+    padding: 10px 8px;
+    margin: 6px 0;
+    border: none;
+    border-radius: 8px 8px 0 0;
+    background: none;
+    color: var(--gray-700);
+    font-weight: 500;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .mobile-tab.active {
+    background: var(--primary);
+    color: #fff;
+    font-weight: 700;
+  }
+}
 :root {
   color: #0f1419;
   background: #f8f9fa;

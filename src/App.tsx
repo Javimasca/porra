@@ -474,6 +474,20 @@ function App() {
         )}
       </aside>
 
+      {/* Barra de pestañas móvil */}
+      <nav className="mobile-tabs" aria-label="Navegacion móvil">
+        {visibleTabs.map((tab) => (
+          <button
+            className={activeTab === tab ? 'mobile-tab active' : 'mobile-tab'}
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            type="button"
+          >
+            {tab}
+          </button>
+        ))}
+      </nav>
+
       <section className="workspace">
         {activeTab === 'Formulario' && (
           <section>
