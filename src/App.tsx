@@ -333,6 +333,9 @@ function App() {
     [participants, predictions, scoringTournamentState],
   )
   const visibleTabs = mode === 'publico' ? publicTabs : adminTabs
+  const selectedPrediction = predictions.find(
+    (prediction) => prediction.participantId === selectedPredictionParticipantId,
+  )
   const enteredAccessCode = publicForm.accessCode.trim()
   const publicCodeHasInput = enteredAccessCode.length > 0
   const publicFormRequiredCount = publicFormErrors.length
@@ -413,7 +416,7 @@ function App() {
       <aside className="sidebar" aria-label="Navegacion principal">
         <div>
           <p className="eyebrow">Porra Mundial 2026</p>
-          <h1>Admin de la porra</h1>
+          <h1>Panel de control</h1>
         </div>
         <nav className="nav-list">
           {visibleTabs.map((tab) => (
@@ -1414,6 +1417,22 @@ function App() {
                 >
                   Guardar prediccion
                 </button>
+                <button
+                  className="secondary-action"
+                  disabled={!selectedPredictionParticipantId || !selectedPrediction}
+                  onClick={() => {
+                    setPredictions((current) =>
+                      current.map((prediction) =>
+                        prediction.participantId === selectedPredictionParticipantId
+                          ? { ...prediction, locked: !prediction.locked }
+                          : prediction,
+                      ),
+                    )
+                  }}
+                  type="button"
+                >
+                  {selectedPrediction?.locked ? 'Reabrir edicion' : 'Marcar definitiva'}
+                </button>
               </div>
             </header>
 
@@ -1433,6 +1452,10 @@ function App() {
               <div className="prediction-summary">
                 <strong>{Object.keys(matchPredictions).length}</strong>
                 <span>marcadores rellenados</span>
+              </div>
+              <div className="prediction-summary">
+                <strong>{selectedPrediction?.locked ? 'Definitiva' : selectedPrediction ? 'Borrador' : '-'}</strong>
+                <span>estado de la porra</span>
               </div>
             </div>
 
