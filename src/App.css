@@ -702,6 +702,18 @@ tbody tr:last-child td {
   gap: 16px;
 }
 
+.rules-summary {
+  margin-bottom: 16px;
+}
+
+.rules-summary h3 {
+  margin-top: 0;
+}
+
+.rules-summary p:last-child {
+  margin-bottom: 0;
+}
+
 .fixture-count {
   padding: 10px 14px;
   border-radius: 8px;

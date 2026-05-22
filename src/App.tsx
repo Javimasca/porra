@@ -4,7 +4,7 @@ import { participants as initialParticipants, predictions as initialPredictions,
 import { buildLeaderboard } from './domain/scoring'
 import type { Match, MatchPrediction, Participant, ParticipantStatus, PredictionSlip, TournamentState } from './domain/types'
 
-const publicTabs = ['Formulario', 'Cuadro', 'Clasificacion'] as const
+const publicTabs = ['Formulario', 'Cuadro', 'Clasificacion', 'Reglas'] as const
 const adminTabs = ['Panel', 'Cuadro', 'Participantes', 'Predicciones', 'Eliminatorias', 'Resultados', 'Clasificacion', 'Reglas'] as const
 const tabs = [...publicTabs, ...adminTabs] as const
 type Tab = (typeof tabs)[number]
@@ -1825,14 +1825,27 @@ function App() {
             <header className="section-header">
               <div>
                 <p className="eyebrow">Mundial 2026</p>
-                <h2>Reglas adaptadas</h2>
+                <h2>Reglas de la porra</h2>
               </div>
             </header>
+            <div className="rules-summary panel">
+              <h3>Como funciona</h3>
+              <p>
+                Cada participante entra con su codigo personal, completa sus pronosticos del Mundial 2026 y puede
+                guardarlos como borrador o enviarlos como definitivos. Los borradores se pueden editar; una porra
+                definitiva queda bloqueada y solo se puede reabrir solicitandolo al administrador.
+              </p>
+              <p>
+                La clasificacion se actualiza con los resultados reales introducidos en la aplicacion. Gana quien
+                acumule mas puntos al finalizar el torneo.
+              </p>
+            </div>
             <div className="rules-grid">
-              <Rule title="Fase de grupos" text="Signo 1-X-2: 1 punto. Resultado exacto: 3 puntos. Pleno de signos del grupo: 10 puntos." />
-              <Rule title="Clasificados" text="Primeros de grupo con tabla progresiva. Segundos por grupo. Mejores terceros por equipo clasificado, sin exigir el grupo exacto." />
-              <Rule title="Eliminatorias" text="Ronda de 32 incluida. Se predice marcador tras 120 minutos y ganador por penaltis si hay empate." />
-              <Rule title="Bonus finales" text="Campeon: 40. Semifinalistas: 3, 8, 14 o 20. Maximo goleador: 25. MVP: 25." />
+              <Rule title="Fase de grupos" text="Acertar el signo 1-X-2 suma 1 punto. Acertar el resultado exacto suma 3 puntos. Acertar todos los signos de un grupo suma 10 puntos extra." />
+              <Rule title="Clasificados de grupo" text="Se puntuan los primeros de grupo con una tabla progresiva, los segundos de cada grupo y los mejores terceros por equipo clasificado, sin exigir acertar el grupo exacto." />
+              <Rule title="Eliminatorias" text="Incluye la ronda de 32, octavos, cuartos, semifinales y final. Se predice el marcador tras 120 minutos y, si hay empate, el ganador por penaltis." />
+              <Rule title="Bonus finales" text="Campeon: 40 puntos. Semifinalistas: 3, 8, 14 o 20 puntos segun aciertos. Maximo goleador: 25 puntos. MVP: 25 puntos." />
+              <Rule title="Premios" text="Habra premio para el 1er, 2o y 3er clasificado final. El importe de cada premio esta pendiente de confirmar." />
             </div>
           </section>
         )}
