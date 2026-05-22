@@ -232,10 +232,9 @@ function App() {
             })),
           })
         }
+        setApiReady(true)
       } catch {
         // LocalStorage remains the development fallback when DATABASE_URL is not configured.
-      } finally {
-        setApiReady(true)
       }
     }
 
