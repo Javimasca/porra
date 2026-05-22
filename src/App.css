@@ -51,13 +51,27 @@ button {
   .sidebar {
     grid-column: 1 / -1;
     grid-row: 1;
-    flex-direction: row;
-    gap: 16px;
-    padding: 16px;
-    align-items: center;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 14px 16px;
   }
   
+  .sidebar > div:first-child,
+  .sidebar .nav-list {
+    display: none;
+  }
+
+  .mode-switch {
+    width: min(100%, 300px);
+    margin: 0 auto;
+  }
+
+  .admin-login {
+    width: min(100%, 360px);
+    margin: 0 auto;
+  }
+
   .sidebar h1 {
     max-width: 100%;
     font-size: 1.5rem;
@@ -182,7 +196,7 @@ button {
 
 @media (max-width: 640px) {
   .workspace {
-    padding: 16px;
+    padding: 0 0 16px;
   }
 }
 
@@ -199,6 +213,34 @@ button {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  .public-hero {
+    min-height: 360px;
+    margin: 0 0 18px;
+    padding: 22px 18px;
+    background:
+      linear-gradient(180deg, rgba(5, 12, 26, 0.34) 0%, rgba(5, 12, 26, 0.9) 100%),
+      url('/worldcup-hero.png') 64% center / cover no-repeat;
+  }
+
+  .public-hero-content {
+    max-width: 100%;
+  }
+
+  .public-hero h2 {
+    max-width: 330px;
+    font-size: 2.35rem;
+    line-height: 1.04;
+  }
+
+  .public-hero p:not(.eyebrow) {
+    max-width: 330px;
+    font-size: 0.95rem;
+  }
+
+  .hero-badges span {
+    font-size: 0.78rem;
   }
 }
 
@@ -1465,7 +1507,7 @@ tbody tr:last-child td {
   }
 
   .sidebar {
-    padding: 24px;
+    padding: 14px 16px;
   }
 
   .nav-list {
@@ -1519,7 +1561,7 @@ tbody tr:last-child td {
 
 @media (max-width: 560px) {
   .workspace {
-    padding: 20px;
+    padding: 0 0 16px;
   }
 
   .section-header {

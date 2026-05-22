@@ -354,6 +354,59 @@ function App() {
     setPublicFormConfirmation(null)
     setPublicFormEditMode(false)
   }
+  const savePublicPrediction = (locked: boolean) => {
+    if (!publicParticipant) return
+
+    const participantId = publicParticipant.id
+    const displayName = publicForm.alias.trim() || publicParticipant.name
+    const matches = Object.values(publicForm.matches).filter(
+      (prediction) => Number.isFinite(prediction.homeScore) && Number.isFinite(prediction.awayScore),
+    )
+
+    setParticipants((current) =>
+      current.map((participant) =>
+        participant.id === participantId ? { ...participant, name: displayName } : participant,
+      ),
+    )
+    setPredictions((current) => {
+      const nextPrediction: PredictionSlip = {
+        participantId,
+        locked,
+        champion: publicForm.champion,
+        semifinalists: publicForm.semifinalists,
+        topScorer: publicForm.topScorer,
+        mvp: publicForm.mvp,
+        groupWinners: publicForm.groupWinners,
+        groupQualified: publicForm.groupQualified,
+        bestThirds: publicForm.bestThirds,
+        matches,
+      }
+
+      return current.some((prediction) => prediction.participantId === participantId)
+        ? current.map((prediction) => (prediction.participantId === participantId ? nextPrediction : prediction))
+        : [...current, nextPrediction]
+    })
+
+    setPublicFormConfirmation({
+      participantName: displayName,
+      timestamp: new Date(),
+    })
+
+    setPublicForm((form) => ({
+      ...form,
+      alias: '',
+      champion: '',
+      topScorer: '',
+      mvp: '',
+      semifinalists: [],
+      groupWinners: {},
+      groupQualified: {},
+      bestThirds: [],
+      matches: {},
+    }))
+    setPublicFormEditMode(false)
+    setPublicFormStep('confirmation')
+  }
 
   return (
     <main className="app-shell">
@@ -736,6 +789,13 @@ function App() {
 
                     <div className="form-actions">
                       <button
+                        className="secondary-action"
+                        onClick={() => savePublicPrediction(false)}
+                        type="button"
+                      >
+                        Guardar borrador
+                      </button>
+                      <button
                         className="primary-action"
                         disabled={publicFormErrors.length > 0}
                         onClick={() => {
@@ -795,7 +855,7 @@ function App() {
                         }}
                         type="button"
                       >
-                        Enviar mi predicción
+                        Enviar definitiva
                       </button>
                       <button
                         className="secondary-action"
@@ -1282,6 +1342,13 @@ function App() {
             {reviewParticipantId && (
               <PredictionReview
                 onClose={() => setReviewParticipantId(null)}
+                onToggleLocked={(locked) => {
+                  setPredictions((current) =>
+                    current.map((prediction) =>
+                      prediction.participantId === reviewParticipantId ? { ...prediction, locked } : prediction,
+                    ),
+                  )
+                }}
                 participant={participants.find((participant) => participant.id === reviewParticipantId)}
                 prediction={predictions.find((prediction) => prediction.participantId === reviewParticipantId)}
               />
@@ -1316,9 +1383,12 @@ function App() {
                     )
 
                     setPredictions((current) => {
+                      const existing = current.find(
+                        (prediction) => prediction.participantId === selectedPredictionParticipantId,
+                      )
                       const nextPrediction: PredictionSlip = {
                         participantId: selectedPredictionParticipantId,
-                        locked: true,
+                        locked: existing?.locked ?? true,
                         champion: predictionMeta.champion,
                         semifinalists: predictionMeta.semifinalists,
                         topScorer: predictionMeta.topScorer,
@@ -1859,10 +1929,12 @@ function OfficialResultRow({
 
 function PredictionReview({
   onClose,
+  onToggleLocked,
   participant,
   prediction,
 }: {
   onClose: () => void
+  onToggleLocked: (locked: boolean) => void
   participant?: Participant
   prediction?: PredictionSlip
 }) {
@@ -1881,12 +1953,27 @@ function PredictionReview({
           <h3>Revision de {participant.name}</h3>
           <span>{participant.contact}</span>
         </div>
-        <button className="small-action" onClick={onClose} type="button">Cerrar</button>
+        <div className="row-actions">
+          {prediction && (
+            <button
+              className="small-action"
+              onClick={() => onToggleLocked(!prediction.locked)}
+              type="button"
+            >
+              {prediction.locked ? 'Reabrir edicion' : 'Marcar definitiva'}
+            </button>
+          )}
+          <button className="small-action" onClick={onClose} type="button">Cerrar</button>
+        </div>
       </header>
       {!prediction ? (
         <p className="muted-copy">Este participante aun no tiene prediccion guardada.</p>
       ) : (
         <div className="review-grid">
+          <div className="score-pill">
+            <span>Estado</span>
+            <strong>{prediction.locked ? 'Definitiva' : 'Borrador'}</strong>
+          </div>
           <div className="score-pill">
             <span>Marcadores de grupo</span>
             <strong>{completedMatches}/72</strong>
