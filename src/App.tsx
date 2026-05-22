@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import './App.css'
 import { participants as initialParticipants, predictions as initialPredictions, tournamentState as initialTournamentState } from './data/mockData'
 import { buildLeaderboard } from './domain/scoring'
@@ -561,35 +563,50 @@ function App() {
             {publicFormStep === 'confirmation' && publicParticipant && (
               <div className="form-intake">
                 <div className="success-panel">
-                  <strong>✓ Predicción guardada</strong>
-                  <p>
-                    Hola <strong>{publicFormConfirmation?.participantName || publicParticipant.name}</strong>, tu porra se guardó correctamente.
-                  </p>
-                  <p className="form-description">
-                    {publicParticipantPrediction?.locked
-                      ? 'Tu predicción está bloqueada y no puede ser modificada.'
-                      : 'Tu predicción está pendiente de revisión y puedes editarla.'}
-                  </p>
-                </div>
-                <div className="form-actions">
-                  <button
-                    className="primary-action"
-                    onClick={() => setPublicFormStep('form')}
-                    type="button"
-                  >
-                    Ver mi predicción
-                  </button>
-                  <button
-                    className="secondary-action"
-                    onClick={() => {
-                      resetPublicForm()
-                      setPublicFormStep('code-input')
-                    }}
-                    type="button"
-                  >
-                    Usar otro código
-                  </button>
-                </div>
+  <strong>✓ Predicción guardada</strong>
+
+  <p>
+    Hola{' '}
+    <strong>
+      {publicFormConfirmation?.participantName || publicParticipant.name}
+    </strong>
+    , tu porra se guardó correctamente.
+  </p>
+
+  {publicParticipantPrediction?.locked && (
+    <p className="form-description">
+      Se ha descargado un PDF oficial de tu predicción.
+      Debes enviarlo al administrador por seguridad.
+    </p>
+  )}
+
+  <p className="form-description">
+    {publicParticipantPrediction?.locked
+      ? 'Tu predicción está bloqueada y no puede ser modificada.'
+      : 'Tu predicción está pendiente de revisión y puedes editarla.'}
+  </p>
+</div>
+
+<div className="form-actions">
+  <button
+    className="primary-action"
+    onClick={() => setPublicFormStep('form')}
+    type="button"
+  >
+    Ver mi predicción
+  </button>
+
+  <button
+    className="secondary-action"
+    onClick={() => {
+      resetPublicForm()
+      setPublicFormStep('code-input')
+    }}
+    type="button"
+  >
+    Usar otro código
+  </button>
+</div>
               </div>
             )}
 
@@ -852,6 +869,26 @@ function App() {
                                 )
                               : [...current, nextPrediction]
                           })
+
+generatePredictionPdf({
+  participant: publicParticipant,
+  prediction: {
+    participantId,
+    locked: true,
+    reopenRequested: false,
+    champion: publicForm.champion,
+    semifinalists: publicForm.semifinalists,
+    topScorer: publicForm.topScorer,
+    mvp: publicForm.mvp,
+    groupWinners: publicForm.groupWinners,
+    groupQualified: publicForm.groupQualified,
+    bestThirds: publicForm.bestThirds,
+    matches,
+  },
+  matches: tournamentState.matches.filter(
+    (match) => match.stage === 'Grupo',
+  ),
+})
 
                           setPublicFormConfirmation({
                             participantName: displayName,
@@ -2734,6 +2771,85 @@ function normalizeParticipantAccessCode(participant: Participant): Participant {
     ...participant,
     accessCode: createAccessCode(participant.name),
   }
+}
+
+function generatePredictionPdf({
+  participant,
+  prediction,
+  matches,
+}: {
+  participant: Participant
+  prediction: PredictionSlip
+  matches: Match[]
+}) {
+  const doc = new jsPDF()
+
+  doc.setFontSize(20)
+  doc.text('Porra Mundial 2026', 14, 20)
+
+  doc.setFontSize(12)
+  doc.text(`Participante: ${participant.name}`, 14, 35)
+  doc.text(`Codigo: ${participant.accessCode}`, 14, 43)
+  doc.text(`Fecha: ${new Date().toLocaleString()}`, 14, 51)
+
+  doc.setFontSize(14)
+  doc.text('Predicciones finales', 14, 66)
+
+  const summaryRows = [
+    ['Campeon', prediction.champion || '-'],
+    ['Maximo goleador', prediction.topScorer || '-'],
+    ['MVP', prediction.mvp || '-'],
+    ['Semifinalistas', prediction.semifinalists.join(', ') || '-'],
+    ['Mejores terceros', prediction.bestThirds.join(', ') || '-'],
+  ]
+
+  autoTable(doc, {
+    startY: 72,
+    head: [['Concepto', 'Prediccion']],
+    body: summaryRows,
+  })
+
+  const tableRows = matches.map((match) => {
+    const predictionMatch = prediction.matches.find(
+      (item) => item.matchId === match.id,
+    )
+
+    return [
+      match.group || match.stage,
+      match.home,
+      predictionMatch?.homeScore ?? '-',
+      predictionMatch?.awayScore ?? '-',
+      match.away,
+    ]
+  })
+
+  autoTable(doc, {
+    startY: (doc as any).lastAutoTable.finalY + 12,
+    head: [['Grupo', 'Local', 'GL', 'GV', 'Visitante']],
+    body: tableRows,
+    styles: {
+      fontSize: 8,
+    },
+  })
+
+  const finalY = (doc as any).lastAutoTable.finalY + 15
+
+  doc.setFontSize(11)
+  doc.text(
+    'Este documento es el comprobante oficial de la prediccion enviada.',
+    14,
+    finalY,
+  )
+
+  doc.text(
+    'Por seguridad debes enviarlo al administrador.',
+    14,
+    finalY + 8,
+  )
+
+  const fileName = `Porra_${participant.name.replace(/\s+/g, '_')}.pdf`
+
+  doc.save(fileName)
 }
 
 function syncApi(path: string, body: unknown) {
