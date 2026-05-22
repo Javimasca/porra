@@ -563,9 +563,11 @@ function App() {
             {publicFormStep === 'confirmation' && publicParticipant && (
               <div className="form-intake">
                 <div className="success-panel">
-  <strong>✓ Predicción guardada</strong>
+  <strong>
+  ✓ Porra guardada y PDF descargado
+</strong>
 
-  <p>
+   <p>
     Hola{' '}
     <strong>
       {publicFormConfirmation?.participantName || publicParticipant.name}
@@ -575,8 +577,7 @@ function App() {
 
   {publicParticipantPrediction?.locked && (
     <p className="form-description">
-      Se ha descargado un PDF oficial de tu predicción.
-      Debes enviarlo al administrador por seguridad.
+      Por seguridad, debes enviar el PDF descargado al administrador.
     </p>
   )}
 
