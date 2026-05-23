@@ -208,9 +208,18 @@ function App() {
           fetch('/api/tournament', { cache: 'no-store' }),
         ])
 
-        if (!participantsResponse.ok || !predictionsResponse.ok || !tournamentResponse.ok) {
-          throw new Error('API unavailable')
-        }
+        if (!participantsResponse.ok) {
+  throw new Error(`Participants API unavailable: ${participantsResponse.status}`)
+}
+
+if (!predictionsResponse.ok) {
+  throw new Error(`Predictions API unavailable: ${predictionsResponse.status}`)
+}
+
+if (!tournamentResponse.ok) {
+  throw new Error(`Tournament API unavailable: ${tournamentResponse.status}`)
+}
+        
 
         const [apiParticipants, apiPredictions, apiTournament] = await Promise.all([
           participantsResponse.json(),
@@ -236,8 +245,9 @@ function App() {
           })
         }
         setApiReady(true)
-      } catch {
-        // LocalStorage remains the development fallback when DATABASE_URL is not configured.
+              
+      } catch (error) {
+        console.error('No se pudo cargar desde API', error)
       }
     }
 
@@ -606,11 +616,29 @@ function App() {
     <div className="form-actions">
       <button
         className="primary-action"
-        onClick={() => setPublicFormStep('form')}
-        type="button"
-      >
-        Ver mi predicción
-      </button>
+        onClick={() => {
+  if (selectedPrediction) {
+    setPublicForm((current) => ({
+      ...current,
+      champion: selectedPrediction.champion,
+      semifinalists: selectedPrediction.semifinalists,
+      topScorer: selectedPrediction.topScorer,
+      mvp: selectedPrediction.mvp,
+      groupWinners: selectedPrediction.groupWinners,
+      groupQualified: selectedPrediction.groupQualified,
+      bestThirds: selectedPrediction.bestThirds,
+      matches: Object.fromEntries(
+        selectedPrediction.matches.map((match) => [match.matchId, match]),
+      ),
+    }))
+  }
+
+  setPublicFormStep('form')
+}}
+type="button"
+>
+  Ver mi predicción
+</button>
 
       <button
         className="secondary-action"
@@ -690,17 +718,16 @@ function App() {
                       </div>
                     </div>
 
-                    {publicFormErrors.length > 0 && (
-                      <div className="validation-panel">
-                        <strong>Completa todos los campos obligatorios</strong>
-                        <ul>
-                          {publicFormErrors.map((error) => (
-                            <li key={error}>{error}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
+                    {!selectedPrediction?.locked && publicFormErrors.length > 0 && (
+  <div className="validation-panel">
+    <strong>Completa todos los campos obligatorios</strong>
+    <ul>
+      {publicFormErrors.map((error) => (
+        <li key={error}>{error}</li>
+      ))}
+    </ul>
+  </div>
+)}
                     <div className="meta-card">
                       <h3>Tu nombre en la clasificación</h3>
                       <label>
