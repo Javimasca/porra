@@ -378,6 +378,7 @@ function App() {
         participantId,
         locked,
         reopenRequested: false,
+        submittedAt: new Date().toISOString(),
         champion: publicForm.champion,
         semifinalists: publicForm.semifinalists,
         topScorer: publicForm.topScorer,
@@ -561,56 +562,60 @@ function App() {
             )}
 
             {publicFormStep === 'confirmation' && publicParticipant && (
-              <div className="form-intake">
-                <div className="success-panel">
-  <strong>
-  ✓ Porra guardada y PDF descargado
-</strong>
+  <div className="form-intake">
+    <div className="success-panel">
+      <strong>✓ Porra guardada y PDF descargado</strong>
 
-   <p>
-    Hola{' '}
-    <strong>
-      {publicFormConfirmation?.participantName || publicParticipant.name}
-    </strong>
-    , tu porra se guardó correctamente.
-  </p>
+      <p>
+        Hola{' '}
+        <strong>
+          {publicFormConfirmation?.participantName || publicParticipant.name}
+        </strong>
+        , tu porra se guardó correctamente.
+      </p>
 
-  {publicParticipantPrediction?.locked && (
-    <p className="form-description">
-      Por seguridad, debes enviar el PDF descargado al administrador.
-    </p>
-  )}
+      {publicParticipantPrediction?.submittedAt ? (
+        <p className="form-description">
+          Enviada el{' '}
+          {new Date(publicParticipantPrediction.submittedAt).toLocaleString()}
+        </p>
+      ) : null}
 
-  <p className="form-description">
-    {publicParticipantPrediction?.locked
-      ? 'Tu predicción está bloqueada y no puede ser modificada.'
-      : 'Tu predicción está pendiente de revisión y puedes editarla.'}
-  </p>
-</div>
+      {publicParticipantPrediction?.locked && (
+        <p className="form-description">
+          Por seguridad, debes enviar el PDF descargado al administrador.
+        </p>
+      )}
 
-<div className="form-actions">
-  <button
-    className="primary-action"
-    onClick={() => setPublicFormStep('form')}
-    type="button"
-  >
-    Ver mi predicción
-  </button>
+      <p className="form-description">
+        {publicParticipantPrediction?.locked
+          ? 'Tu predicción está bloqueada y no puede ser modificada.'
+          : 'Tu predicción está pendiente de revisión y puedes editarla.'}
+      </p>
+    </div>
 
-  <button
-    className="secondary-action"
-    onClick={() => {
-      resetPublicForm()
-      setPublicFormStep('code-input')
-    }}
-    type="button"
-  >
-    Usar otro código
-  </button>
-</div>
-              </div>
-            )}
+    <div className="form-actions">
+      <button
+        className="primary-action"
+        onClick={() => setPublicFormStep('form')}
+        type="button"
+      >
+        Ver mi predicción
+      </button>
 
+      <button
+        className="secondary-action"
+        onClick={() => {
+          resetPublicForm()
+          setPublicFormStep('code-input')
+        }}
+        type="button"
+      >
+        Usar otro código
+      </button>
+    </div>
+  </div>
+)}
             {publicFormStep === 'form' && publicParticipant && (
               <div className="form-intake">
                 {publicFormConfirmation && (
@@ -851,18 +856,19 @@ function App() {
                           )
                           setPredictions((current) => {
                             const nextPrediction = {
-                              participantId,
-                              locked: true,
-                              reopenRequested: false,
-                              champion: publicForm.champion,
-                              semifinalists: publicForm.semifinalists,
-                              topScorer: publicForm.topScorer,
-                              mvp: publicForm.mvp,
-                              groupWinners: publicForm.groupWinners,
-                              groupQualified: publicForm.groupQualified,
-                              bestThirds: publicForm.bestThirds,
-                              matches,
-                            }
+  participantId,
+  locked: true,
+  reopenRequested: false,
+  submittedAt: new Date().toISOString(),
+  champion: publicForm.champion,
+  semifinalists: publicForm.semifinalists,
+  topScorer: publicForm.topScorer,
+  mvp: publicForm.mvp,
+  groupWinners: publicForm.groupWinners,
+  groupQualified: publicForm.groupQualified,
+  bestThirds: publicForm.bestThirds,
+  matches,
+}
 
                             return current.some((prediction) => prediction.participantId === participantId)
                               ? current.map((prediction) =>
@@ -1564,6 +1570,7 @@ generatePredictionPdf({
                         participantId: selectedPredictionParticipantId,
                         locked: existing?.locked ?? true,
                         reopenRequested: existing?.reopenRequested ?? false,
+                        submittedAt: existing?.submittedAt,
                         champion: predictionMeta.champion,
                         semifinalists: predictionMeta.semifinalists,
                         topScorer: predictionMeta.topScorer,
@@ -1629,9 +1636,22 @@ generatePredictionPdf({
                 <strong>{selectedPrediction?.locked ? 'Definitiva' : selectedPrediction ? 'Borrador' : '-'}</strong>
                 <span>estado de la porra</span>
               </div>
+
+              {selectedPrediction?.submittedAt && (
+  <div className="prediction-summary">
+    <strong>
+      {new Date(selectedPrediction.submittedAt).toLocaleDateString()}
+    </strong>
+    <span>fecha de envio</span>
+  </div>
+)}
               <div className="prediction-summary">
-                <strong>{selectedPrediction?.reopenRequested ? 'Solicitada' : '-'}</strong>
-                <span>reapertura</span>
+                <strong>
+  {selectedPrediction?.reopenRequested
+    ? 'Solicitada'
+    : 'No solicitada'}
+</strong>
+<span>reapertura</span>
               </div>
             </div>
 
@@ -1779,6 +1799,7 @@ generatePredictionPdf({
                       participantId: selectedKnockoutParticipantId,
                       locked: existing?.locked ?? true,
                       reopenRequested: existing?.reopenRequested ?? false,
+                      submittedAt: existing?.submittedAt,
                       champion: existing?.champion ?? '',
                       semifinalists: existing?.semifinalists ?? [],
                       topScorer: existing?.topScorer ?? '',
@@ -2369,6 +2390,14 @@ function PredictionReview({
             <span>Reapertura</span>
             <strong>{prediction.reopenRequested ? 'Solicitada' : '-'}</strong>
           </div>
+          <div className="score-pill">
+  <span>Fecha envio</span>
+  <strong>
+    {prediction.submittedAt
+      ? new Date(prediction.submittedAt).toLocaleString()
+      : '-'}
+  </strong>
+</div>
           <div className="score-pill">
             <span>Marcadores de grupo</span>
             <strong>{completedMatches}/72</strong>

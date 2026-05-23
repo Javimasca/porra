@@ -43,6 +43,7 @@ export type PredictionSlip = {
   groupQualified: Record<string, string[]>
   bestThirds: string[]
   matches: MatchPrediction[]
+  submittedAt?: string
 }
 
 export type TournamentState = {
