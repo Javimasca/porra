@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getPrisma } from '../../../src/lib/prisma'
+import crypto from 'crypto'
+
+function createVerificationCode() {
+  return `PORRA-2026-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
+}
 
 export async function GET() {
   try {
@@ -12,6 +17,7 @@ export async function GET() {
     return NextResponse.json(
       predictions.map((prediction) => ({
         participantId: prediction.participantId,
+        verificationCode: prediction.verificationCode ?? '',
         locked: prediction.locked,
         reopenRequested: prediction.reopenRequested,
         champion: prediction.champion ?? '',
@@ -55,6 +61,7 @@ export async function PUT(request: Request) {
         reopenRequested?: boolean
         champion: string
         semifinalists: string[]
+        verificationCode?: string
         topScorer: string
         mvp: string
         groupWinners: Record<string, string>
@@ -67,7 +74,17 @@ export async function PUT(request: Request) {
           penaltyWinner?: string
         }>
       }>) {
-        const saved = await tx.prediction.upsert({
+      const existingPrediction = await tx.prediction.findUnique({
+  where: { participantId: prediction.participantId },
+  select: { verificationCode: true },
+})
+
+const verificationCode =
+  prediction.locked && !existingPrediction?.verificationCode
+    ? createVerificationCode()
+    : existingPrediction?.verificationCode
+ 
+      const saved = await tx.prediction.upsert({
           where: { participantId: prediction.participantId },
           update: {
             locked: prediction.locked,
@@ -78,7 +95,9 @@ export async function PUT(request: Request) {
             mvp: prediction.mvp,
             groupWinners: prediction.groupWinners,
             groupQualified: prediction.groupQualified,
+            verificationCode: prediction.verificationCode,
             bestThirds: prediction.bestThirds,
+            verificationCode,
           },
           create: {
             participantId: prediction.participantId,
@@ -90,7 +109,9 @@ export async function PUT(request: Request) {
             mvp: prediction.mvp,
             groupWinners: prediction.groupWinners,
             groupQualified: prediction.groupQualified,
+            verificationCode: prediction.verificationCode,
             bestThirds: prediction.bestThirds,
+            verificationCode: prediction.locked ? verificationCode : null,
           },
         })
 
@@ -107,7 +128,12 @@ export async function PUT(request: Request) {
       }
     })
 
-    return NextResponse.json({ ok: true })
+   const savedPredictions = await prisma.prediction.findMany({
+  include: { matches: true },
+  orderBy: { createdAt: 'asc' },
+})
+
+return NextResponse.json({ ok: true, predictions: savedPredictions })
   } catch {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
   }

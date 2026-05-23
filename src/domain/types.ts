@@ -33,6 +33,7 @@ export type MatchPrediction = {
 
 export type PredictionSlip = {
   participantId: string
+  verificationCode?: string
   locked: boolean
   reopenRequested?: boolean
   champion: string
@@ -44,6 +45,7 @@ export type PredictionSlip = {
   bestThirds: string[]
   matches: MatchPrediction[]
   submittedAt?: string
+  pdfReceived?: boolean
 }
 
 export type TournamentState = {

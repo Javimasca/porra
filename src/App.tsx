@@ -6,6 +6,7 @@ import { participants as initialParticipants, predictions as initialPredictions,
 import { buildLeaderboard } from './domain/scoring'
 import type { Match, MatchPrediction, Participant, ParticipantStatus, PredictionSlip, TournamentState } from './domain/types'
 
+
 const publicTabs = ['Formulario', 'Cuadro', 'Clasificacion', 'Reglas'] as const
 const adminTabs = ['Panel', 'Solicitudes', 'Cuadro', 'Participantes', 'Predicciones', 'Eliminatorias', 'Resultados', 'Clasificacion', 'Reglas'] as const
 const tabs = [...publicTabs, ...adminTabs] as const
@@ -374,20 +375,22 @@ function App() {
       ),
     )
     setPredictions((current) => {
-      const nextPrediction: PredictionSlip = {
-        participantId,
-        locked,
-        reopenRequested: false,
-        submittedAt: new Date().toISOString(),
-        champion: publicForm.champion,
-        semifinalists: publicForm.semifinalists,
-        topScorer: publicForm.topScorer,
-        mvp: publicForm.mvp,
-        groupWinners: publicForm.groupWinners,
-        groupQualified: publicForm.groupQualified,
-        bestThirds: publicForm.bestThirds,
-        matches,
-      }
+      const nextPrediction = {
+  participantId,
+  locked: true,
+  reopenRequested: false,
+  submittedAt: new Date().toISOString(),
+  pdfReceived: false,
+  verificationCode: `PORRA-2026-${globalThis.crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+  champion: publicForm.champion,
+  semifinalists: publicForm.semifinalists,
+  topScorer: publicForm.topScorer,
+  mvp: publicForm.mvp,
+  groupWinners: publicForm.groupWinners,
+  groupQualified: publicForm.groupQualified,
+  bestThirds: publicForm.bestThirds,
+  matches,
+}
 
       return current.some((prediction) => prediction.participantId === participantId)
         ? current.map((prediction) => (prediction.participantId === participantId ? nextPrediction : prediction))
@@ -565,6 +568,12 @@ function App() {
   <div className="form-intake">
     <div className="success-panel">
       <strong>✓ Porra guardada y PDF descargado</strong>
+
+    {selectedPrediction?.verificationCode && (
+  <p className="verification-code">
+    Código de verificación: {selectedPrediction.verificationCode}
+  </p>
+)}
 
       <p>
         Hola{' '}
@@ -836,30 +845,33 @@ function App() {
                       >
                         Guardar borrador
                       </button>
-                      <button
-                        className="primary-action"
-                        disabled={publicFormErrors.length > 0}
-                        onClick={() => {
-                          const participantId = publicParticipant.id
-                          const displayName = publicForm.alias.trim() || publicParticipant.name
-                          const matches = Object.values(publicForm.matches).filter(
-                            (prediction) =>
-                              Number.isFinite(prediction.homeScore) && Number.isFinite(prediction.awayScore),
-                          )
+                      
+                        <button
+  className="primary-action"
+  disabled={publicFormErrors.length > 0}
+  onClick={() => {
+    const confirmed = window.confirm(
+      'Vas a enviar tu porra como definitiva. Se descargará un PDF y ya no podrás editarla salvo reapertura del administrador. ¿Continuar?',
+    )
 
-                          setParticipants((current) =>
-                            current.map((participant) =>
-                              participant.id === participantId
-                                ? { ...participant, name: displayName }
-                                : participant,
-                            ),
-                          )
-                          setPredictions((current) => {
-                            const nextPrediction = {
+    if (!confirmed) {
+      return
+    }
+
+   const participantId = publicParticipant.id
+const displayName = publicForm.alias.trim() || publicParticipant.name
+const matches = Object.values(publicForm.matches).filter(
+  (prediction) =>
+    Number.isFinite(prediction.homeScore) && Number.isFinite(prediction.awayScore),
+)
+
+const nextPrediction = {
   participantId,
   locked: true,
   reopenRequested: false,
   submittedAt: new Date().toISOString(),
+  pdfReceived: false,
+  verificationCode: `PORRA-2026-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
   champion: publicForm.champion,
   semifinalists: publicForm.semifinalists,
   topScorer: publicForm.topScorer,
@@ -870,31 +882,27 @@ function App() {
   matches,
 }
 
-                            return current.some((prediction) => prediction.participantId === participantId)
-                              ? current.map((prediction) =>
-                                  prediction.participantId === participantId ? nextPrediction : prediction,
-                                )
-                              : [...current, nextPrediction]
-                          })
+setParticipants((current) =>
+  current.map((participant) =>
+    participant.id === participantId ? { ...participant, name: displayName } : participant,
+  ),
+)
+
+setPredictions((current) =>
+  current.some((prediction) => prediction.participantId === participantId)
+    ? current.map((prediction) =>
+        prediction.participantId === participantId ? nextPrediction : prediction,
+      )
+    : [...current, nextPrediction],
+)
+console.log(nextPrediction)
+console.log('CODIGO PDF', nextPrediction.verificationCode)
+
 
 generatePredictionPdf({
-  participant: publicParticipant,
-  prediction: {
-    participantId,
-    locked: true,
-    reopenRequested: false,
-    champion: publicForm.champion,
-    semifinalists: publicForm.semifinalists,
-    topScorer: publicForm.topScorer,
-    mvp: publicForm.mvp,
-    groupWinners: publicForm.groupWinners,
-    groupQualified: publicForm.groupQualified,
-    bestThirds: publicForm.bestThirds,
-    matches,
-  },
-  matches: tournamentState.matches.filter(
-    (match) => match.stage === 'Grupo',
-  ),
+  participant: { ...publicParticipant, name: displayName },
+  prediction: nextPrediction,
+  matches: tournamentState.matches.filter((match) => match.stage === 'Grupo'),
 })
 
                           setPublicFormConfirmation({
@@ -1612,9 +1620,27 @@ generatePredictionPdf({
                 >
                   {selectedPrediction?.locked ? 'Reabrir edicion' : 'Marcar definitiva'}
                 </button>
-              </div>
+<button
+  className="secondary-action"
+  disabled={!selectedPredictionParticipantId || !selectedPrediction?.locked}
+  onClick={() => {
+    setPredictions((current) =>
+      current.map((prediction) =>
+        prediction.participantId === selectedPredictionParticipantId
+          ? { ...prediction, pdfReceived: !prediction.pdfReceived }
+          : prediction,
+      ),
+    )
+  }}
+  type="button"
+>
+  {selectedPrediction?.pdfReceived ? 'PDF pendiente' : 'PDF recibido'}
+</button>
+
+</div>
             </header>
 
+              
             <div className="prediction-toolbar">
               <label>
                 Participante
@@ -1653,6 +1679,10 @@ generatePredictionPdf({
 </strong>
 <span>reapertura</span>
               </div>
+<div className="prediction-summary">
+  <strong>{selectedPrediction?.pdfReceived ? 'Recibido' : 'Pendiente'}</strong>
+  <span>PDF</span>
+</div>
             </div>
 
             <section className="prediction-meta">
@@ -2367,15 +2397,19 @@ function PredictionReview({
         </div>
         <div className="row-actions">
           {prediction && (
-            <button
-              className="small-action"
-              onClick={() => onToggleLocked(!prediction.locked)}
-              type="button"
-            >
-              {prediction.locked ? 'Reabrir edicion' : 'Marcar definitiva'}
-            </button>
-          )}
-          <button className="small-action" onClick={onClose} type="button">Cerrar</button>
+  <button
+    className="small-action"
+    onClick={() => onToggleLocked(!prediction.locked)}
+    type="button"
+  >
+    {prediction.locked
+      ? 'Reabrir edicion'
+      : 'Marcar definitiva'}
+  </button>
+)}
+
+
+         <button className="small-action" onClick={onClose} type="button">Cerrar</button>
         </div>
       </header>
       {!prediction ? (
@@ -2814,17 +2848,24 @@ function generatePredictionPdf({
 }) {
   const doc = new jsPDF()
 
-  doc.setFontSize(20)
-  doc.text('Porra Mundial 2026', 14, 20)
 
-  doc.setFontSize(12)
-  doc.text(`Participante: ${participant.name}`, 14, 35)
-  doc.text(`Codigo: ${participant.accessCode}`, 14, 43)
-  doc.text(`Fecha: ${new Date().toLocaleString()}`, 14, 51)
+doc.setFontSize(20)
+doc.text('Porra Mundial 2026', 14, 20)
 
-  doc.setFontSize(14)
-  doc.text('Predicciones finales', 14, 66)
+doc.setFontSize(11)
+doc.text(
+  `Codigo de verificacion: ${prediction.verificationCode || 'SIN CODIGO'}`,
+  20,
+  35,
+)
 
+doc.setFontSize(12)
+doc.text(`Participante: ${participant.name}`, 20, 45)
+doc.text(`Codigo: ${participant.accessCode}`, 20, 55)
+doc.text(`Fecha: ${new Date().toLocaleString()}`, 20, 65)
+
+doc.setFontSize(14)
+doc.text('Predicciones finales', 14, 85)
   const summaryRows = [
     ['Campeon', prediction.champion || '-'],
     ['Maximo goleador', prediction.topScorer || '-'],
@@ -2882,15 +2923,24 @@ function generatePredictionPdf({
   doc.save(fileName)
 }
 
-function syncApi(path: string, body: unknown) {
-  fetch(path, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  }).catch((error) => {
+async function syncApi(path: string, body: unknown) {
+  try {
+    const response = await fetch(path, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+throw new Error(`HTTP ${response.status}: ${text}`)
+    }
+
+    return response.json()
+  } catch (error) {
     console.error(`No se pudo sincronizar ${path}`, error)
-    // Keep the localStorage copy as fallback while working without a database.
-  })
+    return null
+  }
 }
 
 function seedOfficialGroupResults(state: TournamentState): TournamentState {
