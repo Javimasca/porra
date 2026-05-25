@@ -87,6 +87,15 @@ export async function PUT(request: Request) {
 })
 
 if (existingPrediction?.locked) {
+  await tx.prediction.update({
+    where: { participantId: prediction.participantId },
+    data: {
+      locked: prediction.locked,
+      reopenRequested: prediction.reopenRequested ?? false,
+      pdfReceived: prediction.pdfReceived ?? false,
+    },
+  })
+
   continue
 }
 
