@@ -35,9 +35,13 @@ export async function GET() {
         })),
       })),
     )
-  } catch {
-    return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
-  }
+  } catch (error) {
+  console.error(error)
+  return NextResponse.json(
+    { error: error instanceof Error ? error.message : 'Database unavailable' },
+    { status: 503 },
+  )
+}
 }
 
 export async function PUT(request: Request) {
@@ -76,44 +80,49 @@ export async function PUT(request: Request) {
       }>) {
       const existingPrediction = await tx.prediction.findUnique({
   where: { participantId: prediction.participantId },
-  select: { verificationCode: true },
+  select: {
+    locked: true,
+    verificationCode: true,
+  },
 })
+
+if (existingPrediction?.locked) {
+  continue
+}
 
 const verificationCode =
   prediction.locked && !existingPrediction?.verificationCode
     ? createVerificationCode()
     : existingPrediction?.verificationCode
- 
-      const saved = await tx.prediction.upsert({
-          where: { participantId: prediction.participantId },
-          update: {
-            locked: prediction.locked,
-            reopenRequested: prediction.reopenRequested ?? false,
-            champion: prediction.champion,
-            semifinalists: prediction.semifinalists,
-            topScorer: prediction.topScorer,
-            mvp: prediction.mvp,
-            groupWinners: prediction.groupWinners,
-            groupQualified: prediction.groupQualified,
-            verificationCode: prediction.verificationCode,
-            bestThirds: prediction.bestThirds,
-            verificationCode,
-          },
-          create: {
-            participantId: prediction.participantId,
-            locked: prediction.locked,
-            reopenRequested: prediction.reopenRequested ?? false,
-            champion: prediction.champion,
-            semifinalists: prediction.semifinalists,
-            topScorer: prediction.topScorer,
-            mvp: prediction.mvp,
-            groupWinners: prediction.groupWinners,
-            groupQualified: prediction.groupQualified,
-            verificationCode: prediction.verificationCode,
-            bestThirds: prediction.bestThirds,
-            verificationCode: prediction.locked ? verificationCode : null,
-          },
-        })
+
+const saved = await tx.prediction.upsert({
+  where: { participantId: prediction.participantId },
+  update: {
+    locked: prediction.locked,
+    reopenRequested: prediction.reopenRequested ?? false,
+    champion: prediction.champion,
+    semifinalists: prediction.semifinalists,
+    topScorer: prediction.topScorer,
+    mvp: prediction.mvp,
+    groupWinners: prediction.groupWinners,
+    groupQualified: prediction.groupQualified,
+    bestThirds: prediction.bestThirds,
+    verificationCode,
+  },
+  create: {
+    participantId: prediction.participantId,
+    locked: prediction.locked,
+    reopenRequested: prediction.reopenRequested ?? false,
+    champion: prediction.champion,
+    semifinalists: prediction.semifinalists,
+    topScorer: prediction.topScorer,
+    mvp: prediction.mvp,
+    groupWinners: prediction.groupWinners,
+    groupQualified: prediction.groupQualified,
+    bestThirds: prediction.bestThirds,
+    verificationCode: prediction.locked ? verificationCode : null,
+  },
+})
 
         await tx.matchPrediction.deleteMany({ where: { predictionId: saved.id } })
         await tx.matchPrediction.createMany({

@@ -9,7 +9,8 @@ export async function GET() {
     })
 
     return NextResponse.json(participants)
-  } catch {
+  } catch (error) {
+    console.error('GET /api/participants error:', error)
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
   }
 }
@@ -19,11 +20,21 @@ export async function PUT(request: Request) {
     const prisma = getPrisma()
     const participants = await request.json()
 
+    if (!Array.isArray(participants)) {
+      return NextResponse.json(
+        { error: 'Invalid participants payload' },
+        { status: 400 },
+      )
+    }
+
     await prisma.$transaction([
       prisma.participant.deleteMany({
         where: {
           id: {
             notIn: participants.map((participant: { id: string }) => participant.id),
+          },
+          predictions: {
+            none: {},
           },
         },
       }),
@@ -54,7 +65,8 @@ export async function PUT(request: Request) {
     ])
 
     return NextResponse.json({ ok: true })
-  } catch {
+  } catch (error) {
+    console.error('PUT /api/participants error:', error)
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
   }
 }

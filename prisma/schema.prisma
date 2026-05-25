@@ -38,7 +38,7 @@ model Prediction {
   id              String            @id @default(cuid())
   participantId   String
   participant     Participant       @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  verificationCode String?           @unique
+  verificationCode String?          
   locked          Boolean           @default(true)
   reopenRequested Boolean           @default(false)
   champion        String?
