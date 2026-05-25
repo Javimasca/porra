@@ -1726,7 +1726,7 @@ generatePredictionPdf({
                 </button>
                 <button
                   className="secondary-action"
-                  disabled={!selectedPredictionParticipantId || selectedPredictionIsLocked}
+                  disabled={!selectedPredictionParticipantId}
                   onClick={() => {
                     setPredictions((current) =>
                       current.map((prediction) =>

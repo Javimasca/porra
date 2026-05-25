@@ -9,6 +9,7 @@ function createVerificationCode() {
 export async function GET() {
   try {
     const prisma = getPrisma()
+
     const predictions = await prisma.prediction.findMany({
       include: { matches: true },
       orderBy: { createdAt: 'asc' },
@@ -36,12 +37,18 @@ export async function GET() {
       })),
     )
   } catch (error) {
-  console.error(error)
-  return NextResponse.json(
-    { error: error instanceof Error ? error.message : 'Database unavailable' },
-    { status: 503 },
-  )
-}
+    console.error(error)
+
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Database unavailable',
+      },
+      { status: 503 },
+    )
+  }
 }
 
 export async function PUT(request: Request) {
@@ -50,7 +57,11 @@ export async function PUT(request: Request) {
     const predictions = await request.json()
 
     await prisma.$transaction(async (tx) => {
-      const participantIds = predictions.map((prediction: { participantId: string }) => prediction.participantId)
+      const participantIds = predictions.map(
+        (prediction: { participantId: string }) =>
+          prediction.participantId,
+      )
+
       await tx.prediction.deleteMany({
         where: {
           participantId: {
@@ -78,62 +89,82 @@ export async function PUT(request: Request) {
           penaltyWinner?: string
         }>
       }>) {
-      const existingPrediction = await tx.prediction.findUnique({
-  where: { participantId: prediction.participantId },
-  select: {
-    locked: true,
-    verificationCode: true,
-  },
-})
+        const existingPrediction = await tx.prediction.findUnique({
+          where: { participantId: prediction.participantId },
+          select: {
+            locked: true,
+            verificationCode: true,
+          },
+        })
 
-if (existingPrediction?.locked) {
-  await tx.prediction.update({
-    where: { participantId: prediction.participantId },
-    data: {
-      locked: prediction.locked,
-      reopenRequested: prediction.reopenRequested ?? false,
-      pdfReceived: prediction.pdfReceived ?? false,
-    },
-  })
+        if (existingPrediction?.locked) {
+          const onlyAdminStateChanged =
+            prediction.locked === false ||
+            prediction.reopenRequested !== undefined
 
-  continue
-}
+          if (onlyAdminStateChanged) {
+            await tx.prediction.update({
+              where: {
+                participantId: prediction.participantId,
+              },
+              data: {
+                locked: prediction.locked,
+                reopenRequested:
+                  prediction.reopenRequested ?? false,
+              },
+            })
+          }
 
-const verificationCode =
-  prediction.locked && !existingPrediction?.verificationCode
-    ? createVerificationCode()
-    : existingPrediction?.verificationCode
+          continue
+        }
 
-const saved = await tx.prediction.upsert({
-  where: { participantId: prediction.participantId },
-  update: {
-    locked: prediction.locked,
-    reopenRequested: prediction.reopenRequested ?? false,
-    champion: prediction.champion,
-    semifinalists: prediction.semifinalists,
-    topScorer: prediction.topScorer,
-    mvp: prediction.mvp,
-    groupWinners: prediction.groupWinners,
-    groupQualified: prediction.groupQualified,
-    bestThirds: prediction.bestThirds,
-    verificationCode,
-  },
-  create: {
-    participantId: prediction.participantId,
-    locked: prediction.locked,
-    reopenRequested: prediction.reopenRequested ?? false,
-    champion: prediction.champion,
-    semifinalists: prediction.semifinalists,
-    topScorer: prediction.topScorer,
-    mvp: prediction.mvp,
-    groupWinners: prediction.groupWinners,
-    groupQualified: prediction.groupQualified,
-    bestThirds: prediction.bestThirds,
-    verificationCode: prediction.locked ? verificationCode : null,
-  },
-})
+        const verificationCode =
+          prediction.locked &&
+          !existingPrediction?.verificationCode
+            ? createVerificationCode()
+            : existingPrediction?.verificationCode
 
-        await tx.matchPrediction.deleteMany({ where: { predictionId: saved.id } })
+        const saved = await tx.prediction.upsert({
+          where: {
+            participantId: prediction.participantId,
+          },
+          update: {
+            locked: prediction.locked,
+            reopenRequested:
+              prediction.reopenRequested ?? false,
+            champion: prediction.champion,
+            semifinalists: prediction.semifinalists,
+            topScorer: prediction.topScorer,
+            mvp: prediction.mvp,
+            groupWinners: prediction.groupWinners,
+            groupQualified: prediction.groupQualified,
+            bestThirds: prediction.bestThirds,
+            verificationCode,
+          },
+          create: {
+            participantId: prediction.participantId,
+            locked: prediction.locked,
+            reopenRequested:
+              prediction.reopenRequested ?? false,
+            champion: prediction.champion,
+            semifinalists: prediction.semifinalists,
+            topScorer: prediction.topScorer,
+            mvp: prediction.mvp,
+            groupWinners: prediction.groupWinners,
+            groupQualified: prediction.groupQualified,
+            bestThirds: prediction.bestThirds,
+            verificationCode: prediction.locked
+              ? verificationCode
+              : null,
+          },
+        })
+
+        await tx.matchPrediction.deleteMany({
+          where: {
+            predictionId: saved.id,
+          },
+        })
+
         await tx.matchPrediction.createMany({
           data: prediction.matches.map((match) => ({
             predictionId: saved.id,
@@ -146,13 +177,26 @@ const saved = await tx.prediction.upsert({
       }
     })
 
-   const savedPredictions = await prisma.prediction.findMany({
-  include: { matches: true },
-  orderBy: { createdAt: 'asc' },
-})
+    const savedPredictions = await prisma.prediction.findMany({
+      include: { matches: true },
+      orderBy: { createdAt: 'asc' },
+    })
 
-return NextResponse.json({ ok: true, predictions: savedPredictions })
-  } catch {
-    return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
+    return NextResponse.json({
+      ok: true,
+      predictions: savedPredictions,
+    })
+  } catch (error) {
+    console.error(error)
+
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Database unavailable',
+      },
+      { status: 503 },
+    )
   }
 }
