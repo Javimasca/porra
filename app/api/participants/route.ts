@@ -27,11 +27,38 @@ export async function PUT(request: Request) {
       )
     }
 
+    const incomingIds = participants.map((participant: { id: string }) => participant.id)
+
+    const protectedParticipants = await prisma.participant.findMany({
+      where: {
+        id: {
+          notIn: incomingIds,
+        },
+        predictions: {
+          some: {},
+        },
+      },
+      select: {
+        name: true,
+      },
+    })
+
+    if (protectedParticipants.length > 0) {
+      return NextResponse.json(
+        {
+          error: `No se puede borrar porque tiene predicción: ${protectedParticipants
+            .map((participant) => participant.name)
+            .join(', ')}`,
+        },
+        { status: 409 },
+      )
+    }
+
     await prisma.$transaction([
       prisma.participant.deleteMany({
         where: {
           id: {
-            notIn: participants.map((participant: { id: string }) => participant.id),
+            notIn: incomingIds,
           },
           predictions: {
             none: {},
