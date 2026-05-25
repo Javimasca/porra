@@ -349,6 +349,7 @@ if (!tournamentResponse.ok) {
   const selectedPrediction = predictions.find(
     (prediction) => prediction.participantId === selectedPredictionParticipantId,
   )
+const selectedPredictionIsLocked = selectedPrediction?.locked ?? false
   const enteredAccessCode = publicForm.accessCode.trim()
   const publicCodeHasInput = enteredAccessCode.length > 0
   const publicFormRequiredCount = publicFormErrors.length
@@ -746,39 +747,74 @@ type="button"
                       <h3>Predicción pre-torneo</h3>
                       <div className="meta-grid">
                         <TeamSelect
-                          label="Campeón"
-                          onChange={(value) => setPublicForm((form) => ({ ...form, champion: value }))}
-                          teams={allTeams}
-                          value={publicForm.champion}
-                        />
+  disabled={selectedPredictionIsLocked}
+  label="Campeon"
+  onChange={(value) => {
+  if (selectedPredictionIsLocked) {
+    return
+  }
+
+  setPredictionMeta((meta) => ({ ...meta, champion: value }))
+}}  teams={allTeams}
+  value={predictionMeta.champion}
+/>
                         <label>
                           Máximo goleador
-                          <input
-                            onChange={(event) =>
-                              setPublicForm((form) => ({ ...form, topScorer: event.target.value }))
-                            }
-                            placeholder="Nombre del jugador"
-                            value={publicForm.topScorer}
-                          />
+                         
+                            <input
+  disabled={selectedPredictionIsLocked}
+
+    onChange={(event) => {
+  if (selectedPredictionIsLocked) {
+    return
+  }
+
+  setPredictionMeta((meta) => ({
+    ...meta,
+    topScorer: event.target.value,
+  }))
+}}
+  
+  placeholder="Nombre del jugador"
+  value={predictionMeta.topScorer}
+/>
                         </label>
                         <label>
                           MVP del torneo
                           <input
-                            onChange={(event) =>
-                              setPublicForm((form) => ({ ...form, mvp: event.target.value }))
-                            }
-                            placeholder="Nombre del jugador"
-                            value={publicForm.mvp}
-                          />
+  disabled={selectedPredictionIsLocked}
+  onChange={(event) => {
+  if (selectedPredictionIsLocked) {
+    return
+  }
+
+  setPredictionMeta((meta) => ({
+    ...meta,
+    mvp: event.target.value,
+  }))
+}}
+  placeholder="Nombre del jugador"
+  value={predictionMeta.mvp}
+/>
                         </label>
                       </div>
                       <MultiTeamPicker
-                        label="Semifinalistas (4 equipos)"
-                        limit={4}
-                        onChange={(teams) => setPublicForm((form) => ({ ...form, semifinalists: teams }))}
-                        selected={publicForm.semifinalists}
-                        teams={allTeams}
-                      />
+  disabled={selectedPredictionIsLocked}
+  label="Semifinalistas"
+  limit={4}
+  onChange={(teams) => {
+  if (selectedPredictionIsLocked) {
+    return
+  }
+
+  setPredictionMeta((meta) => ({
+    ...meta,
+    semifinalists: teams,
+  }))
+}}
+  selected={predictionMeta.semifinalists}
+  teams={allTeams}
+/>
                       <MultiTeamPicker
                         label="Mejores terceros (8 equipos)"
                         limit={8}
@@ -800,7 +836,8 @@ type="button"
                                 Grupo <span translate="no">{group}</span>
                               </h4>
                               <TeamSelect
-                                label="Primero"
+  disabled={selectedPredictionIsLocked}
+  label="Primero"
                                 onChange={(value) =>
                                   setPublicForm((form) => ({
                                     ...form,
@@ -811,7 +848,8 @@ type="button"
                                 value={publicForm.groupWinners[group] ?? ''}
                               />
                               <MultiTeamPicker
-                                label="Clasificados"
+  disabled={selectedPredictionIsLocked}
+  label="Clasificados"
                                 limit={3}
                                 onChange={(teams) =>
                                   setPublicForm((form) => ({
@@ -834,10 +872,11 @@ type="button"
                       <div className="prediction-board">
                         {groups.map((group) => (
                           <PredictionGroup
-                            group={group}
-                            key={group}
-                            matches={tournamentState.matches.filter((match) => match.group === group)}
-                            onChange={(matchId, side, value) => {
+  disabled={selectedPredictionIsLocked}
+  group={group}
+  key={group}
+  matches={tournamentState.matches.filter((match) => match.group === group)}
+  onChange={(matchId, side, value) => {
                               const parsedValue = value === '' ? Number.NaN : Number(value)
                               setPublicForm((form) => {
                                 const previous = form.matches[matchId] ?? {
@@ -1652,11 +1691,11 @@ generatePredictionPdf({
                   }}
                   type="button"
                 >
-                  Guardar prediccion
+                  {selectedPredictionIsLocked ? 'Predicción bloqueada' : 'Guardar prediccion'}
                 </button>
                 <button
                   className="secondary-action"
-                  disabled={!selectedPredictionParticipantId || !selectedPrediction}
+                  disabled={!selectedPredictionParticipantId || selectedPredictionIsLocked}
                   onClick={() => {
                     setPredictions((current) =>
                       current.map((prediction) =>
@@ -1739,8 +1778,10 @@ generatePredictionPdf({
               <div className="meta-card">
                 <h3>Bonus finales</h3>
                 <div className="meta-grid">
-                  <TeamSelect
-                    label="Campeon"
+                 <TeamSelect
+  disabled={selectedPredictionIsLocked}
+  label="Campeon"
+                   
                     onChange={(value) => setPredictionMeta((meta) => ({ ...meta, champion: value }))}
                     teams={allTeams}
                     value={predictionMeta.champion}
@@ -1748,7 +1789,8 @@ generatePredictionPdf({
                   <label>
                     Maximo goleador
                     <input
-                      onChange={(event) =>
+                     disabled={selectedPredictionIsLocked} 
+                     onChange={(event) =>
                         setPredictionMeta((meta) => ({ ...meta, topScorer: event.target.value }))
                       }
                       placeholder="Nombre del jugador"
@@ -1758,6 +1800,7 @@ generatePredictionPdf({
                   <label>
                     MVP
                     <input
+                      disabled={selectedPredictionIsLocked}
                       onChange={(event) => setPredictionMeta((meta) => ({ ...meta, mvp: event.target.value }))}
                       placeholder="Nombre del jugador"
                       value={predictionMeta.mvp}
@@ -1765,19 +1808,30 @@ generatePredictionPdf({
                   </label>
                 </div>
                 <MultiTeamPicker
-                  label="Semifinalistas"
+  disabled={selectedPredictionIsLocked}
+  label="Semifinalistas"
                   limit={4}
                   onChange={(teams) => setPredictionMeta((meta) => ({ ...meta, semifinalists: teams }))}
                   selected={predictionMeta.semifinalists}
                   teams={allTeams}
                 />
                 <MultiTeamPicker
-                  label="Mejores terceros"
-                  limit={8}
-                  onChange={(teams) => setPredictionMeta((meta) => ({ ...meta, bestThirds: teams }))}
-                  selected={predictionMeta.bestThirds}
-                  teams={allTeams}
-                />
+  label="Mejores terceros"
+  disabled={selectedPredictionIsLocked}
+   limit={8}
+  onChange={(teams) => {
+  if (selectedPredictionIsLocked) {
+    return
+  }
+
+  setPredictionMeta((meta) => ({
+    ...meta,
+    bestThirds: teams,
+  }))
+}}
+  selected={predictionMeta.bestThirds}
+  teams={allTeams}
+/>
               </div>
 
               <div className="meta-card">
@@ -1791,25 +1845,41 @@ generatePredictionPdf({
                           Grupo <span translate="no">{group}</span>
                         </h4>
                         <TeamSelect
-                          label="Primero"
-                          onChange={(value) =>
-                            setPredictionMeta((meta) => ({
-                              ...meta,
-                              groupWinners: { ...meta.groupWinners, [group]: value },
-                            }))
-                          }
+  disabled={selectedPredictionIsLocked}
+  label="Primero"
+                          onChange={(value) => {
+  if (selectedPredictionIsLocked) {
+    return
+  }
+
+  setPredictionMeta((meta) => ({
+    ...meta,
+    groupWinners: {
+      ...meta.groupWinners,
+      [group]: value,
+    },
+  }))
+}}
                           teams={groupTeams}
                           value={predictionMeta.groupWinners[group] ?? ''}
                         />
                         <MultiTeamPicker
-                          label="Clasificados"
+  disabled={selectedPredictionIsLocked}
+  label="Clasificados"
                           limit={3}
-                          onChange={(teams) =>
-                            setPredictionMeta((meta) => ({
-                              ...meta,
-                              groupQualified: { ...meta.groupQualified, [group]: teams },
-                            }))
-                          }
+                          onChange={(teams) => {
+  if (selectedPredictionIsLocked) {
+    return
+  }
+
+  setPredictionMeta((meta) => ({
+    ...meta,
+    groupQualified: {
+      ...meta.groupQualified,
+      [group]: teams,
+    },
+  }))
+}}
                           selected={predictionMeta.groupQualified[group] ?? []}
                           teams={groupTeams}
                         />
@@ -1823,13 +1893,20 @@ generatePredictionPdf({
             <div className="prediction-board">
               {groups.map((group) => (
                 <PredictionGroup
+                  disabled={selectedPredictionIsLocked}
+
                   group={group}
                   key={group}
                   matches={tournamentState.matches.filter((match) => match.group === group)}
                   onChange={(matchId, side, value) => {
-                    const parsedValue = value === '' ? Number.NaN : Number(value)
-                    setMatchPredictions((current) => {
-                      const previous = current[matchId] ?? {
+  if (selectedPredictionIsLocked) {
+    return
+  }
+
+  const parsedValue = value === '' ? Number.NaN : Number(value)
+
+setMatchPredictions((current) => {
+                    const previous = current[matchId] ?? {
                         matchId,
                         homeScore: Number.NaN,
                         awayScore: Number.NaN,
@@ -3106,11 +3183,13 @@ function PredictionGroup({
 }
 
 function TeamSelect({
+  disabled = false,
   label,
   onChange,
   teams,
   value,
 }: {
+  disabled?: boolean
   label: string
   onChange: (value: string) => void
   teams: string[]
@@ -3119,7 +3198,7 @@ function TeamSelect({
   return (
     <label>
       {label}
-      <select onChange={(event) => onChange(event.target.value)} value={value}>
+      <select disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
         <option value="">Seleccionar</option>
         {teams.map((team) => (
           <option key={team} value={team}>{team}</option>
@@ -3130,12 +3209,14 @@ function TeamSelect({
 }
 
 function MultiTeamPicker({
+  disabled = false,
   label,
   limit,
   onChange,
   selected,
   teams,
 }: {
+  disabled?: boolean
   label: string
   limit: number
   onChange: (teams: string[]) => void
@@ -3150,9 +3231,10 @@ function MultiTeamPicker({
           const checked = selected.includes(team)
           return (
             <label className="check-option" key={team}>
-              <input
-                checked={checked}
-                disabled={!checked && selected.length >= limit}
+              
+                <input
+  checked={checked}
+  disabled={disabled || (!checked && selected.length >= limit)}
                 onChange={(event) => {
                   if (event.target.checked) {
                     onChange([...selected, team])
