@@ -420,7 +420,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
   participantId,
   locked,
   reopenRequested: false,
-  submittedAt: new Date().toISOString(),
+  submittedAt: locked ? new Date().toISOString() : undefined,
   pdfReceived: false,
   verificationCode: locked
   ? `PORRA-2026-${globalThis.crypto.randomUUID().slice(0, 8).toUpperCase()}`
@@ -626,7 +626,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
         , tu porra se guardó correctamente.
       </p>
 
-      {publicParticipantPrediction?.submittedAt ? (
+      {publicParticipantPrediction?.locked && publicParticipantPrediction.submittedAt ? (
         <p className="form-description">
           Enviada el{' '}
           {new Date(publicParticipantPrediction.submittedAt).toLocaleString()}
@@ -650,18 +650,18 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
       <button
         className="primary-action"
         onClick={() => {
-  if (selectedPrediction) {
+  if (publicParticipantPrediction) {
     setPublicForm((current) => ({
       ...current,
-      champion: selectedPrediction.champion,
-      semifinalists: selectedPrediction.semifinalists,
-      topScorer: selectedPrediction.topScorer,
-      mvp: selectedPrediction.mvp,
-      groupWinners: selectedPrediction.groupWinners,
-      groupQualified: selectedPrediction.groupQualified,
-      bestThirds: selectedPrediction.bestThirds,
+      champion: publicParticipantPrediction.champion,
+      semifinalists: publicParticipantPrediction.semifinalists,
+      topScorer: publicParticipantPrediction.topScorer,
+      mvp: publicParticipantPrediction.mvp,
+      groupWinners: publicParticipantPrediction.groupWinners,
+      groupQualified: publicParticipantPrediction.groupQualified,
+      bestThirds: publicParticipantPrediction.bestThirds,
       matches: Object.fromEntries(
-        selectedPrediction.matches.map((match) => [match.matchId, match]),
+        publicParticipantPrediction.matches.map((match) => [match.matchId, match]),
       ),
     }))
   }
@@ -743,7 +743,13 @@ type="button"
                       </div>
                       <div>
                         <span>Estado</span>
-                        <strong>{publicParticipantPrediction ? 'Porra enviada' : 'Porra pendiente'}</strong>
+                        <strong>
+                          {publicParticipantPrediction
+                            ? publicParticipantPrediction.locked
+                              ? 'Definitiva'
+                              : 'Borrador'
+                            : 'Porra pendiente'}
+                        </strong>
                       </div>
                       <div>
                         <span>Pendiente por completar</span>
@@ -751,7 +757,7 @@ type="button"
                       </div>
                     </div>
 
-                    {!selectedPrediction?.locked && publicFormErrors.length > 0 && (
+                    {!publicParticipantPrediction?.locked && publicFormErrors.length > 0 && (
   <div className="validation-panel">
     <strong>Completa todos los campos obligatorios</strong>
     <ul>
@@ -779,72 +785,72 @@ type="button"
                       <h3>Predicción pre-torneo</h3>
                       <div className="meta-grid">
                         <TeamSelect
-  disabled={selectedPredictionIsLocked}
+  disabled={publicParticipantPrediction?.locked}
   label="Campeon"
   onChange={(value) => {
-  if (selectedPredictionIsLocked) {
+  if (publicParticipantPrediction?.locked) {
     return
   }
 
-  setPredictionMeta((meta) => ({ ...meta, champion: value }))
+  setPublicForm((form) => ({ ...form, champion: value }))
 }}  teams={allTeams}
-  value={predictionMeta.champion}
+  value={publicForm.champion}
 />
                         <label>
                           Máximo goleador
                          
                             <input
-  disabled={selectedPredictionIsLocked}
+  disabled={publicParticipantPrediction?.locked}
 
     onChange={(event) => {
-  if (selectedPredictionIsLocked) {
+  if (publicParticipantPrediction?.locked) {
     return
   }
 
-  setPredictionMeta((meta) => ({
-    ...meta,
+  setPublicForm((form) => ({
+    ...form,
     topScorer: event.target.value,
   }))
 }}
   
   placeholder="Nombre del jugador"
-  value={predictionMeta.topScorer}
+  value={publicForm.topScorer}
 />
                         </label>
                         <label>
                           MVP del torneo
                           <input
-  disabled={selectedPredictionIsLocked}
+  disabled={publicParticipantPrediction?.locked}
   onChange={(event) => {
-  if (selectedPredictionIsLocked) {
+  if (publicParticipantPrediction?.locked) {
     return
   }
 
-  setPredictionMeta((meta) => ({
-    ...meta,
+  setPublicForm((form) => ({
+    ...form,
     mvp: event.target.value,
   }))
 }}
   placeholder="Nombre del jugador"
-  value={predictionMeta.mvp}
+  value={publicForm.mvp}
 />
                         </label>
                       </div>
                       <MultiTeamPicker
-  disabled={selectedPredictionIsLocked}
+  disabled={publicParticipantPrediction?.locked}
   label="Semifinalistas"
   limit={4}
   onChange={(teams) => {
-  if (selectedPredictionIsLocked) {
+  if (publicParticipantPrediction?.locked) {
     return
   }
 
-  setPredictionMeta((meta) => ({
-    ...meta,
+  setPublicForm((form) => ({
+    ...form,
     semifinalists: teams,
   }))
 }}
-  selected={predictionMeta.semifinalists}
+  selected={publicForm.semifinalists}
   teams={allTeams}
 />
                       <MultiTeamPicker
@@ -868,7 +874,7 @@ type="button"
                                 Grupo <span translate="no">{group}</span>
                               </h4>
                               <TeamSelect
-  disabled={selectedPredictionIsLocked}
+  disabled={publicParticipantPrediction?.locked}
   label="Primero"
                                 onChange={(value) =>
                                   setPublicForm((form) => ({
@@ -880,7 +886,7 @@ type="button"
                                 value={publicForm.groupWinners[group] ?? ''}
                               />
                               <MultiTeamPicker
-  disabled={selectedPredictionIsLocked}
+  disabled={publicParticipantPrediction?.locked}
   label="Clasificados"
                                 limit={3}
                                 onChange={(teams) =>
@@ -904,7 +910,7 @@ type="button"
                       <div className="prediction-board">
                         {groups.map((group) => (
                           <PredictionGroup
-  disabled={selectedPredictionIsLocked}
+  disabled={publicParticipantPrediction?.locked}
   group={group}
   key={group}
   matches={tournamentState.matches.filter((match) => match.group === group)}
