@@ -29,6 +29,17 @@ const participantsStorageKey = 'porra-2026-participants'
 const predictionsStorageKey = 'porra-2026-predictions'
 const tournamentStorageKey = 'porra-2026-tournament'
 const adminPin = '2026'
+type PredictionPhase =
+  | 'preGroups'
+  | 'groupsClosed'
+  | 'Ronda de 32'
+  | 'Octavos'
+  | 'Cuartos'
+  | 'Semifinal'
+  | 'Final'
+  | 'closed'
+
+const predictionPhase: PredictionPhase = 'preGroups'
 const groups = 'ABCDEFGHIJKL'.split('')
 const knockoutStages = ['Ronda de 32', 'Octavos', 'Cuartos', 'Semifinal', 'Final'] as const
 const allTeams = Array.from(
@@ -350,6 +361,25 @@ if (!tournamentResponse.ok) {
     (prediction) => prediction.participantId === selectedPredictionParticipantId,
   )
 const selectedPredictionIsLocked = selectedPrediction?.locked ?? false
+
+const initialPredictionClosed =
+  predictionPhase === 'groupsClosed' ||
+  predictionPhase === 'knockoutsOpen' ||
+  predictionPhase === 'closed'
+
+const knockoutsPredictionOpen = predictionPhase === 'knockoutsOpen'
+
+const allPredictionsClosed = predictionPhase === 'closed'
+const currentKnockoutStage =
+  predictionPhase === 'Ronda de 32' ||
+  predictionPhase === 'Octavos' ||
+  predictionPhase === 'Cuartos' ||
+  predictionPhase === 'Semifinal' ||
+  predictionPhase === 'Final'
+    ? predictionPhase
+    : null
+
+const knockoutEditingEnabled = currentKnockoutStage !== null
   const enteredAccessCode = publicForm.accessCode.trim()
   const publicCodeHasInput = enteredAccessCode.length > 0
   const publicFormRequiredCount = publicFormErrors.length
@@ -905,16 +935,17 @@ type="button"
 
                     <div className="form-actions">
                       <button
-                        className="secondary-action"
-                        onClick={() => savePublicPrediction(false)}
-                        type="button"
-                      >
-                        Guardar borrador
-                      </button>
+  className="secondary-action"
+  disabled={initialPredictionClosed}
+  onClick={() => savePublicPrediction(false)}
+  type="button"
+>
+  Guardar borrador
+</button>
                       
                         <button
   className="primary-action"
-  disabled={publicFormErrors.length > 0}
+  disabled={publicFormErrors.length > 0 || initialPredictionClosed}
   onClick={() => {
     const confirmed = window.confirm(
       'Vas a enviar tu porra como definitiva. Se descargará un PDF y ya no podrás editarla salvo reapertura del administrador. ¿Continuar?',
@@ -1936,8 +1967,8 @@ setMatchPredictions((current) => {
                 <h2>Predicciones de eliminatorias</h2>
               </div>
               <button
-                className="primary-action"
-                disabled={!selectedKnockoutParticipantId}
+  className="primary-action"
+  disabled={!selectedKnockoutParticipantId || !knockoutEditingEnabled}
                 onClick={() => {
                   const filledKnockoutPredictions = Object.values(knockoutPredictions).filter(
                     (prediction) =>
@@ -1949,6 +1980,18 @@ setMatchPredictions((current) => {
                       (prediction) => prediction.participantId === selectedKnockoutParticipantId,
                     )
                     const groupPredictions = existing?.matches.filter((prediction) => {
+
+                     const editableStagePredictions =
+  filledKnockoutPredictions.filter((prediction) => {
+    const match = tournamentState.matches.find(
+      (item) => item.id === prediction.matchId,
+    )
+
+    return (
+      match?.stage ===
+      (currentKnockoutStage ?? activeKnockoutStage)
+    )
+  })
                       const match = tournamentState.matches.find((item) => item.id === prediction.matchId)
                       return match?.stage === 'Grupo'
                     }) ?? []
@@ -1964,7 +2007,7 @@ setMatchPredictions((current) => {
                       groupWinners: existing?.groupWinners ?? {},
                       groupQualified: existing?.groupQualified ?? {},
                       bestThirds: existing?.bestThirds ?? [],
-                      matches: [...groupPredictions, ...filledKnockoutPredictions],
+                      matches: [...groupPredictions, ...editableStagePredictions],
                     }
 
                     return existing
@@ -1976,7 +2019,7 @@ setMatchPredictions((current) => {
                 }}
                 type="button"
               >
-                Guardar ronda
+                {knockoutEditingEnabled ? 'Guardar ronda' : 'Ronda cerrada'}
               </button>
             </header>
 
@@ -1996,11 +2039,12 @@ setMatchPredictions((current) => {
               <label>
                 Ronda
                 <select
-                  onChange={(event) =>
-                    setActiveKnockoutStage(event.target.value as (typeof knockoutStages)[number])
-                  }
-                  value={activeKnockoutStage}
-                >
+  disabled={currentKnockoutStage !== null}
+  onChange={(event) =>
+    setActiveKnockoutStage(event.target.value as (typeof knockoutStages)[number])
+  }
+  value={currentKnockoutStage ?? activeKnockoutStage}
+>
                   {knockoutStages.map((stage) => (
                     <option key={stage} value={stage}>{stage === 'Ronda de 32' ? 'Dieciseisavos' : stage}</option>
                   ))}
@@ -2018,7 +2062,11 @@ setMatchPredictions((current) => {
 
             <div className="knockout-prediction-list">
               {tournamentState.matches
-                .filter((match) => match.stage === activeKnockoutStage)
+                .filter(
+  (match) =>
+    match.stage ===
+    (currentKnockoutStage ?? activeKnockoutStage),
+)
                 .map((match) => (
                   <KnockoutPredictionRow
                     key={match.id}
