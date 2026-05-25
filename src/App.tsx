@@ -1536,15 +1536,38 @@ generatePredictionPdf({
                             Baja
                           </button>
                           <button
-                            className="delete-action"
-                            onClick={() => {
-                              setParticipants((current) => current.filter((item) => item.id !== player.id))
-                              setEditingParticipantId((current) => (current === player.id ? null : current))
-                            }}
-                            type="button"
-                          >
-                            Eliminar
-                          </button>
+  className="delete-action"
+  onClick={async () => {
+    const hasPrediction = predictions.some(
+      (prediction) => prediction.participantId === player.id,
+    )
+
+    if (hasPrediction) {
+      window.alert(
+        `No se puede eliminar a ${player.name} porque tiene una predicción asociada.`,
+      )
+      return
+    }
+
+    const confirmed = window.confirm(
+      `¿Seguro que quieres eliminar a ${player.name}? Esta acción no se puede deshacer.`,
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setParticipants((current) =>
+      current.filter((item) => item.id !== player.id),
+    )
+    setEditingParticipantId((current) =>
+      current === player.id ? null : current,
+    )
+  }}
+  type="button"
+>
+  Eliminar
+</button>
                         </div>
                       </td>
                     </tr>
