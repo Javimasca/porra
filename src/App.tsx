@@ -418,11 +418,13 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     setPredictions((current) => {
       const nextPrediction = {
   participantId,
-  locked: true,
+  locked,
   reopenRequested: false,
   submittedAt: new Date().toISOString(),
   pdfReceived: false,
-  verificationCode: `PORRA-2026-${globalThis.crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+  verificationCode: locked
+  ? `PORRA-2026-${globalThis.crypto.randomUUID().slice(0, 8).toUpperCase()}`
+  : '',
   champion: publicForm.champion,
   semifinalists: publicForm.semifinalists,
   topScorer: publicForm.topScorer,
