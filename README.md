@@ -1,73 +1,65 @@
-# React + TypeScript + Vite
+# Porra Mundial 2026
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplicacion Next.js/React para gestionar una porra del Mundial 2026: alta de participantes, envio de predicciones, administracion de resultados y clasificacion por puntos.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Next.js 16 y React 19
+- Prisma 7 con PostgreSQL
+- TypeScript
+- jsPDF para justificantes en PDF
 
-## React Compiler
+## Configuracion
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Instala dependencias:
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. Crea `.env.local` a partir de `.env.example`:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
+ADMIN_PIN="change-me"
 ```
+
+`ADMIN_PIN` protege las escrituras administrativas de la API. Si no esta definido, las rutas `PUT` quedan abiertas para facilitar desarrollo local.
+
+3. Genera Prisma y aplica migraciones:
+
+```bash
+npm run prisma:generate
+npm run prisma:migrate
+```
+
+## Desarrollo
+
+```bash
+npm run dev
+```
+
+La app queda disponible en `http://localhost:3000`.
+
+## Scripts
+
+- `npm run dev`: arranca Next en desarrollo.
+- `npm run build`: genera Prisma y compila la app.
+- `npm run lint`: ejecuta ESLint.
+- `npm test`: ejecuta los tests de dominio.
+- `npm run prisma:migrate`: crea/aplica migraciones en desarrollo.
+- `npm run prisma:deploy`: aplica migraciones en despliegue.
+
+## Notas de seguridad
+
+- No guardes el PIN de administracion en el cliente. El servidor valida `ADMIN_PIN` mediante la cabecera `x-admin-pin`.
+- Las rutas de escritura validan la forma basica de los payloads antes de tocar base de datos.
+- Las sincronizaciones completas heredadas ya no borran participantes ni predicciones ausentes del payload.
+
+## Estructura relevante
+
+- `src/App.tsx`: interfaz principal.
+- `app/api/*/route.ts`: rutas API de Next.
+- `src/domain/scoring.ts`: reglas de puntuacion.
+- `src/domain/scoring.test.ts`: cobertura de las reglas de puntuacion.
+- `prisma/schema.prisma`: modelos de base de datos.

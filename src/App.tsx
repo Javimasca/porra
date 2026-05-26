@@ -28,7 +28,6 @@ type GroupTeamStanding = TeamStanding & { group: string }
 const participantsStorageKey = 'porra-2026-participants'
 const predictionsStorageKey = 'porra-2026-predictions'
 const tournamentStorageKey = 'porra-2026-tournament'
-const adminPin = '2026'
 type PredictionPhase =
   | 'preGroups'
   | 'groupsClosed'
@@ -267,24 +266,24 @@ if (!tournamentResponse.ok) {
 
   useEffect(() => {
     localStorage.setItem(participantsStorageKey, JSON.stringify(participants))
-    if (apiReady) {
-      syncApi('/api/participants', participants)
+    if (apiReady && adminPinInput) {
+      syncApi('/api/participants', participants, adminPinInput)
     }
-  }, [apiReady, participants])
+  }, [adminPinInput, apiReady, participants])
 
   useEffect(() => {
     localStorage.setItem(predictionsStorageKey, JSON.stringify(predictions))
-    if (apiReady) {
-      syncApi('/api/predictions', predictions)
+    if (apiReady && adminPinInput) {
+      syncApi('/api/predictions', predictions, adminPinInput)
     }
-  }, [apiReady, predictions])
+  }, [adminPinInput, apiReady, predictions])
 
   useEffect(() => {
     localStorage.setItem(tournamentStorageKey, JSON.stringify(tournamentState))
-    if (apiReady) {
-      syncApi('/api/tournament', tournamentState)
+    if (apiReady && adminPinInput) {
+      syncApi('/api/tournament', tournamentState, adminPinInput)
     }
-  }, [apiReady, tournamentState])
+  }, [adminPinInput, apiReady, tournamentState])
 
   useEffect(() => {
     if (!selectedPredictionParticipantId) {
@@ -401,7 +400,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     setPublicFormConfirmation(null)
     setPublicFormEditMode(false)
   }
-  const savePublicPrediction = (locked: boolean) => {
+  const savePublicPrediction = async (locked: boolean) => {
     if (!publicParticipant) return
 
     const participantId = publicParticipant.id
@@ -410,35 +409,47 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
       (prediction) => Number.isFinite(prediction.homeScore) && Number.isFinite(prediction.awayScore),
     )
 
+    const saved = await submitPublicPrediction({
+      accessCode: publicForm.accessCode,
+      displayName,
+      locked,
+      champion: publicForm.champion,
+      semifinalists: publicForm.semifinalists,
+      topScorer: publicForm.topScorer,
+      mvp: publicForm.mvp,
+      groupWinners: publicForm.groupWinners,
+      groupQualified: publicForm.groupQualified,
+      bestThirds: publicForm.bestThirds,
+      matches,
+    })
+
+    if (!saved) return
+
+    const nextPrediction = {
+      ...saved.prediction,
+      submittedAt: locked ? new Date().toISOString() : undefined,
+      pdfReceived: false,
+    }
+
     setParticipants((current) =>
       current.map((participant) =>
         participant.id === participantId ? { ...participant, name: displayName } : participant,
       ),
     )
-    setPredictions((current) => {
-      const nextPrediction = {
-  participantId,
-  locked,
-  reopenRequested: false,
-  submittedAt: locked ? new Date().toISOString() : undefined,
-  pdfReceived: false,
-  verificationCode: locked
-  ? `PORRA-2026-${globalThis.crypto.randomUUID().slice(0, 8).toUpperCase()}`
-  : '',
-  champion: publicForm.champion,
-  semifinalists: publicForm.semifinalists,
-  topScorer: publicForm.topScorer,
-  mvp: publicForm.mvp,
-  groupWinners: publicForm.groupWinners,
-  groupQualified: publicForm.groupQualified,
-  bestThirds: publicForm.bestThirds,
-  matches,
-}
 
-      return current.some((prediction) => prediction.participantId === participantId)
+    setPredictions((current) =>
+      current.some((prediction) => prediction.participantId === participantId)
         ? current.map((prediction) => (prediction.participantId === participantId ? nextPrediction : prediction))
-        : [...current, nextPrediction]
-    })
+        : [...current, nextPrediction],
+    )
+
+    if (locked) {
+      generatePredictionPdf({
+        participant: { ...publicParticipant, name: displayName },
+        prediction: nextPrediction,
+        matches: tournamentState.matches.filter((match) => match.stage === 'Grupo'),
+      })
+    }
 
     setPublicFormConfirmation({
       participantName: displayName,
@@ -493,8 +504,10 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
           </button>
           <button
             className={mode === 'admin' ? 'mode-button active' : 'mode-button'}
-            onClick={() => {
-              if (adminPinInput !== adminPin) {
+            onClick={async () => {
+              const verified = await verifyAdminPin(adminPinInput)
+
+              if (!verified) {
                 setAdminError('PIN incorrecto')
                 return
               }
@@ -963,71 +976,7 @@ type="button"
       return
     }
 
-   const participantId = publicParticipant.id
-const displayName = publicForm.alias.trim() || publicParticipant.name
-const matches = Object.values(publicForm.matches).filter(
-  (prediction) =>
-    Number.isFinite(prediction.homeScore) && Number.isFinite(prediction.awayScore),
-)
-
-const nextPrediction = {
-  participantId,
-  locked: true,
-  reopenRequested: false,
-  submittedAt: new Date().toISOString(),
-  pdfReceived: false,
-  verificationCode: `PORRA-2026-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-  champion: publicForm.champion,
-  semifinalists: publicForm.semifinalists,
-  topScorer: publicForm.topScorer,
-  mvp: publicForm.mvp,
-  groupWinners: publicForm.groupWinners,
-  groupQualified: publicForm.groupQualified,
-  bestThirds: publicForm.bestThirds,
-  matches,
-}
-
-setParticipants((current) =>
-  current.map((participant) =>
-    participant.id === participantId ? { ...participant, name: displayName } : participant,
-  ),
-)
-
-setPredictions((current) =>
-  current.some((prediction) => prediction.participantId === participantId)
-    ? current.map((prediction) =>
-        prediction.participantId === participantId ? nextPrediction : prediction,
-      )
-    : [...current, nextPrediction],
-)
-console.log(nextPrediction)
-console.log('CODIGO PDF', nextPrediction.verificationCode)
-
-
-generatePredictionPdf({
-  participant: { ...publicParticipant, name: displayName },
-  prediction: nextPrediction,
-  matches: tournamentState.matches.filter((match) => match.stage === 'Grupo'),
-})
-
-                          setPublicFormConfirmation({
-                            participantName: displayName,
-                            timestamp: new Date(),
-                          })
-
-                          setPublicForm((form) => ({
-                            ...form,
-                            alias: '',
-                            champion: '',
-                            topScorer: '',
-                            mvp: '',
-                            semifinalists: [],
-                            groupWinners: {},
-                            groupQualified: {},
-                            bestThirds: [],
-                            matches: {},
-                          }))
-                          setPublicFormStep('confirmation')
+    savePublicPrediction(true)
                         }}
                         type="button"
                       >
@@ -3106,11 +3055,14 @@ doc.text('Predicciones finales', 14, 85)
   doc.save(fileName)
 }
 
-async function syncApi(path: string, body: unknown) {
+async function syncApi(path: string, body: unknown, adminPin?: string) {
   try {
     const response = await fetch(path, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(adminPin ? { 'x-admin-pin': adminPin } : {}),
+      },
       body: JSON.stringify(body),
     })
 
@@ -3122,6 +3074,53 @@ throw new Error(`HTTP ${response.status}: ${text}`)
     return response.json()
   } catch (error) {
     console.error(`No se pudo sincronizar ${path}`, error)
+    return null
+  }
+}
+
+async function verifyAdminPin(pin: string) {
+  try {
+    const response = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    })
+
+    return response.ok
+  } catch (error) {
+    console.error('No se pudo verificar el PIN admin', error)
+    return false
+  }
+}
+
+async function submitPublicPrediction(body: {
+  accessCode: string
+  displayName: string
+  locked: boolean
+  champion: string
+  semifinalists: string[]
+  topScorer: string
+  mvp: string
+  groupWinners: Record<string, string>
+  groupQualified: Record<string, string[]>
+  bestThirds: string[]
+  matches: MatchPrediction[]
+}): Promise<{ prediction: PredictionSlip } | null> {
+  try {
+    const response = await fetch('/api/predictions/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`HTTP ${response.status}: ${text}`)
+    }
+
+    return response.json()
+  } catch (error) {
+    console.error('No se pudo guardar la prediccion publica', error)
     return null
   }
 }

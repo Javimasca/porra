@@ -1,9 +1,79 @@
 import { NextResponse } from 'next/server'
 import { getPrisma } from '../../../src/lib/prisma'
+import { requireAdmin } from '../../../src/lib/apiSecurity'
 import crypto from 'crypto'
 
 function createVerificationCode() {
   return `PORRA-2026-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+    && Object.values(value).every((item) => typeof item === 'string')
+}
+
+function isStringArrayRecord(value: unknown): value is Record<string, string[]> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+    && Object.values(value).every(isStringArray)
+}
+
+function isMatchPrediction(value: unknown): value is {
+  matchId: string
+  homeScore: number
+  awayScore: number
+  penaltyWinner?: string
+} {
+  if (!value || typeof value !== 'object') return false
+
+  const match = value as Record<string, unknown>
+  return (
+    typeof match.matchId === 'string' &&
+    Number.isInteger(match.homeScore) &&
+    Number.isInteger(match.awayScore) &&
+    (match.penaltyWinner === undefined || typeof match.penaltyWinner === 'string')
+  )
+}
+
+function isPrediction(value: unknown): value is {
+  participantId: string
+  locked: boolean
+  reopenRequested?: boolean
+  champion: string
+  semifinalists: string[]
+  verificationCode?: string
+  topScorer: string
+  mvp: string
+  groupWinners: Record<string, string>
+  groupQualified: Record<string, string[]>
+  bestThirds: string[]
+  matches: Array<{
+    matchId: string
+    homeScore: number
+    awayScore: number
+    penaltyWinner?: string
+  }>
+} {
+  if (!value || typeof value !== 'object') return false
+
+  const prediction = value as Record<string, unknown>
+  return (
+    typeof prediction.participantId === 'string' &&
+    typeof prediction.locked === 'boolean' &&
+    (prediction.reopenRequested === undefined || typeof prediction.reopenRequested === 'boolean') &&
+    typeof prediction.champion === 'string' &&
+    isStringArray(prediction.semifinalists) &&
+    typeof prediction.topScorer === 'string' &&
+    typeof prediction.mvp === 'string' &&
+    isStringRecord(prediction.groupWinners) &&
+    isStringArrayRecord(prediction.groupQualified) &&
+    isStringArray(prediction.bestThirds) &&
+    Array.isArray(prediction.matches) &&
+    prediction.matches.every(isMatchPrediction)
+  )
 }
 
 export async function GET() {
@@ -52,43 +122,22 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const unauthorized = requireAdmin(request)
+  if (unauthorized) return unauthorized
+
   try {
     const prisma = getPrisma()
     const predictions = await request.json()
 
-    await prisma.$transaction(async (tx) => {
-      const participantIds = predictions.map(
-        (prediction: { participantId: string }) =>
-          prediction.participantId,
+    if (!Array.isArray(predictions) || !predictions.every(isPrediction)) {
+      return NextResponse.json(
+        { error: 'Invalid predictions payload' },
+        { status: 400 },
       )
+    }
 
-      await tx.prediction.deleteMany({
-        where: {
-          participantId: {
-            notIn: participantIds,
-          },
-        },
-      })
-
-      for (const prediction of predictions as Array<{
-        participantId: string
-        locked: boolean
-        reopenRequested?: boolean
-        champion: string
-        semifinalists: string[]
-        verificationCode?: string
-        topScorer: string
-        mvp: string
-        groupWinners: Record<string, string>
-        groupQualified: Record<string, string[]>
-        bestThirds: string[]
-        matches: Array<{
-          matchId: string
-          homeScore: number
-          awayScore: number
-          penaltyWinner?: string
-        }>
-      }>) {
+    await prisma.$transaction(async (tx) => {
+      for (const prediction of predictions) {
         const existingPrediction = await tx.prediction.findUnique({
           where: { participantId: prediction.participantId },
           select: {

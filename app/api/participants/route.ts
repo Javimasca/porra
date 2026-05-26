@@ -1,5 +1,28 @@
 import { NextResponse } from 'next/server'
+import { requireAdmin } from '../../../src/lib/apiSecurity'
 import { getPrisma } from '../../../src/lib/prisma'
+
+const statuses = new Set(['pendiente', 'validado', 'retirado'])
+
+function isParticipant(item: unknown): item is {
+  id: string
+  name: string
+  contact: string
+  accessCode: string
+  status: string
+} {
+  if (!item || typeof item !== 'object') return false
+
+  const participant = item as Record<string, unknown>
+  return (
+    typeof participant.id === 'string' &&
+    typeof participant.name === 'string' &&
+    typeof participant.contact === 'string' &&
+    typeof participant.accessCode === 'string' &&
+    typeof participant.status === 'string' &&
+    statuses.has(participant.status)
+  )
+}
 
 export async function GET() {
   try {
@@ -16,62 +39,22 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const unauthorized = requireAdmin(request)
+  if (unauthorized) return unauthorized
+
   try {
     const prisma = getPrisma()
     const participants = await request.json()
 
-    if (!Array.isArray(participants)) {
+    if (!Array.isArray(participants) || !participants.every(isParticipant)) {
       return NextResponse.json(
         { error: 'Invalid participants payload' },
         { status: 400 },
       )
     }
 
-    const incomingIds = participants.map((participant: { id: string }) => participant.id)
-
-    const protectedParticipants = await prisma.participant.findMany({
-      where: {
-        id: {
-          notIn: incomingIds,
-        },
-        predictions: {
-          some: {},
-        },
-      },
-      select: {
-        name: true,
-      },
-    })
-
-    if (protectedParticipants.length > 0) {
-      return NextResponse.json(
-        {
-          error: `No se puede borrar porque tiene predicción: ${protectedParticipants
-            .map((participant) => participant.name)
-            .join(', ')}`,
-        },
-        { status: 409 },
-      )
-    }
-
     await prisma.$transaction([
-      prisma.participant.deleteMany({
-        where: {
-          id: {
-            notIn: incomingIds,
-          },
-          predictions: {
-            none: {},
-          },
-        },
-      }),
-      ...participants.map((participant: {
-        id: string
-        name: string
-        contact: string
-        accessCode: string
-        status: string
-      }) =>
+      ...participants.map((participant) =>
         prisma.participant.upsert({
           where: { id: participant.id },
           update: {
