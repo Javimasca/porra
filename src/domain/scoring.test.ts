@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { scorePrediction } from './scoring'
+import { scorePrediction, scorePredictionDetails } from './scoring'
 import type { PredictionSlip, TournamentState } from './types'
 
 const basePrediction: PredictionSlip = {
@@ -138,5 +138,36 @@ describe('scorePrediction', () => {
     assert.equal(pointsFor('Goleador', prediction, state), 25)
     assert.equal(pointsFor('MVP', prediction, state), 25)
   })
-})
 
+  it('returns points by match and positive bonuses', () => {
+    const state: TournamentState = {
+      champion: 'Spain',
+      semifinalists: [],
+      groupWinners: {},
+      groupQualified: {},
+      bestThirds: [],
+      matches: [
+        {
+          id: 'g-a-1',
+          group: 'A',
+          stage: 'Grupo',
+          home: 'Spain',
+          away: 'Japan',
+          homeScore: 2,
+          awayScore: 1,
+          status: 'finalizado',
+        },
+      ],
+    }
+    const prediction: PredictionSlip = {
+      ...basePrediction,
+      champion: 'Spain',
+      matches: [{ matchId: 'g-a-1', homeScore: 2, awayScore: 1 }],
+    }
+
+    const details = scorePredictionDetails(prediction, state)
+
+    assert.equal(details.matches['g-a-1'], 3)
+    assert.deepEqual(details.bonuses, [{ label: 'Campeon', points: 40 }])
+  })
+})

@@ -1317,12 +1317,46 @@ tbody tr:last-child td {
 
 .prediction-row {
   display: grid;
-  grid-template-columns: 58px minmax(110px, 1fr) 46px 18px 46px minmax(110px, 1fr);
+  grid-template-columns: 58px minmax(110px, 1fr) 46px 18px 46px minmax(110px, 1fr) 42px;
   align-items: center;
   gap: 8px;
   min-height: 44px;
   padding: 6px 10px;
   border-bottom: 1px solid #e8edf1;
+}
+
+.prediction-row-score-low {
+  background: #eef8f1;
+}
+
+.prediction-row-score-medium {
+  background: #c9f2d6;
+}
+
+.prediction-row-score-high {
+  background: #fff3d2;
+}
+
+.prediction-points {
+  justify-self: end;
+  color: #16703a;
+  font-size: 0.8rem;
+}
+
+.score-bonus-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.score-bonus-list span {
+  border-radius: 999px;
+  background: #fff3d2;
+  color: #815400;
+  font-size: 0.82rem;
+  font-weight: 900;
+  padding: 6px 10px;
 }
 
 .prediction-row:last-child {

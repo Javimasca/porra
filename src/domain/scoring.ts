@@ -104,6 +104,27 @@ export function scorePrediction(prediction: PredictionSlip, state: TournamentSta
   ]
 }
 
+export function scorePredictionDetails(prediction: PredictionSlip, state: TournamentState) {
+  const matches = Object.fromEntries(
+    state.matches
+      .filter((match) => match.status === 'finalizado')
+      .map((match) => {
+        const pick = prediction.matches.find((item) => item.matchId === match.id)
+        const points = pick
+          ? match.stage === 'Grupo'
+            ? scoreGroupMatch(pick, match)
+            : scoreKnockoutMatch(pick, match)
+          : 0
+
+        return [match.id, points]
+      }),
+  )
+  const breakdown = scorePrediction(prediction, state)
+  const bonuses = breakdown.filter((item) => item.points > 0 && item.label !== 'Partidos de grupo' && item.label !== 'Eliminatorias')
+
+  return { matches, bonuses }
+}
+
 function scoreGroupMatch(prediction: MatchPrediction, match: Match) {
   const signPoints = sameSign(prediction, match) ? 1 : 0
   const exactPoints = exactScore(prediction, match) ? 2 : 0

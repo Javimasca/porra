@@ -3,9 +3,9 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import './App.css'
 import { participants as initialParticipants, predictions as initialPredictions, tournamentState as initialTournamentState } from './data/mockData'
-import { buildLeaderboard } from './domain/scoring'
+import { buildLeaderboard, scorePredictionDetails } from './domain/scoring'
 import { getClosedPredictionStages, isPredictionPhase, predictionPhases, type PredictionPhase } from './domain/phases'
-import type { Match, MatchPrediction, Participant, ParticipantStatus, PredictionSlip, TournamentState } from './domain/types'
+import type { Match, MatchPrediction, Participant, ParticipantStatus, PredictionSlip, ScoreBreakdown, TournamentState } from './domain/types'
 
 
 const publicTabs = ['Formulario', 'Pronosticos', 'Cuadro', 'Clasificacion', 'Reglas'] as const
@@ -147,6 +147,7 @@ function App() {
   const [mode, setMode] = useState<'publico' | 'admin'>('publico')
   const [adminPinInput, setAdminPinInput] = useState('')
   const [adminError, setAdminError] = useState('')
+  const [adminAuthenticated, setAdminAuthenticated] = useState(false)
   const [apiReady, setApiReady] = useState(false)
   const [predictionPhase, setPredictionPhase] = useState<PredictionPhase>(defaultPredictionPhase)
   const [participants, setParticipants] = useState<Participant[]>(loadParticipants)
@@ -207,7 +208,7 @@ function App() {
       try {
         const [participantsResponse, predictionsResponse, tournamentResponse, phaseResponse] = await Promise.all([
           fetch('/api/participants', { cache: 'no-store' }),
-          fetch('/api/predictions', { cache: 'no-store' }),
+          fetch('/api/predictions/public', { cache: 'no-store' }),
           fetch('/api/tournament', { cache: 'no-store' }),
           fetch('/api/settings/prediction-phase', { cache: 'no-store' }),
         ])
@@ -266,24 +267,24 @@ if (!tournamentResponse.ok) {
 
   useEffect(() => {
     localStorage.setItem(participantsStorageKey, JSON.stringify(participants))
-    if (apiReady && adminPinInput) {
+    if (apiReady && adminAuthenticated) {
       syncApi('/api/participants', participants, adminPinInput)
     }
-  }, [adminPinInput, apiReady, participants])
+  }, [adminAuthenticated, adminPinInput, apiReady, participants])
 
   useEffect(() => {
     localStorage.setItem(predictionsStorageKey, JSON.stringify(predictions))
-    if (apiReady && adminPinInput) {
+    if (apiReady && adminAuthenticated) {
       syncApi('/api/predictions', predictions, adminPinInput)
     }
-  }, [adminPinInput, apiReady, predictions])
+  }, [adminAuthenticated, adminPinInput, apiReady, predictions])
 
   useEffect(() => {
     localStorage.setItem(tournamentStorageKey, JSON.stringify(tournamentState))
-    if (apiReady && adminPinInput) {
+    if (apiReady && adminAuthenticated) {
       syncApi('/api/tournament', tournamentState, adminPinInput)
     }
-  }, [adminPinInput, apiReady, tournamentState])
+  }, [adminAuthenticated, adminPinInput, apiReady, tournamentState])
 
   useEffect(() => {
     if (!selectedPredictionParticipantId) {
@@ -363,6 +364,15 @@ if (!tournamentResponse.ok) {
         (prediction) => prediction.participantId === selectedPublicPredictionParticipantId,
       )
     : publicVisiblePredictions
+  const scoringDetailsByParticipant = useMemo(
+    () => Object.fromEntries(
+      predictions.map((prediction) => [
+        prediction.participantId,
+        scorePredictionDetails(prediction, scoringTournamentState),
+      ]),
+    ),
+    [predictions, scoringTournamentState],
+  )
   const selectedPrediction = predictions.find(
     (prediction) => prediction.participantId === selectedPredictionParticipantId,
   )
@@ -515,11 +525,17 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
               const verified = await verifyAdminPin(adminPinInput)
 
               if (!verified) {
+                setAdminAuthenticated(false)
                 setAdminError('PIN incorrecto')
                 return
               }
 
+              setAdminAuthenticated(true)
               setAdminError('')
+              const adminPredictions = await loadAdminPredictions(adminPinInput)
+              if (adminPredictions) {
+                setPredictions(adminPredictions)
+              }
               setMode('admin')
               setActiveTab('Panel')
             }}
@@ -799,6 +815,7 @@ type="button"
                           value={publicForm.alias}
                         />
                       </label>
+                      <ScoreBonusList bonuses={scoringDetailsByParticipant[publicParticipantPrediction.participantId]?.bonuses ?? []} />
                     </div>
 
                     <div className="meta-card">
@@ -1161,6 +1178,7 @@ type="button"
                             key={group}
                             matches={tournamentState.matches.filter((match) => match.group === group)}
                             onChange={() => undefined}
+                            pointsByMatch={scoringDetailsByParticipant[publicParticipantPrediction.participantId]?.matches}
                             predictions={Object.fromEntries(
                               publicParticipantPrediction.matches.map((match) => [match.matchId, match]),
                             )}
@@ -1262,6 +1280,7 @@ type="button"
                                     <p>{prediction.bestThirds.join(' · ') || '-'}</p>
                                   </div>
                                 </div>
+                                <ScoreBonusList bonuses={scoringDetailsByParticipant[prediction.participantId]?.bonuses ?? []} />
                               </div>
                             </section>
 
@@ -1288,6 +1307,7 @@ type="button"
                                     (match) => match.stage === 'Grupo' && match.group === group,
                                   )}
                                   onChange={() => undefined}
+                                  pointsByMatch={scoringDetailsByParticipant[prediction.participantId]?.matches}
                                   predictions={visiblePredictions}
                                 />
                               ))}
@@ -1304,6 +1324,7 @@ type="button"
                                 group={stage}
                                 matches={tournamentState.matches.filter((match) => match.stage === stage)}
                                 onChange={() => undefined}
+                                pointsByMatch={scoringDetailsByParticipant[prediction.participantId]?.matches}
                                 predictions={visiblePredictions}
                               />
                             </div>
@@ -3262,6 +3283,24 @@ async function verifyAdminPin(pin: string) {
   }
 }
 
+async function loadAdminPredictions(adminPin: string) {
+  try {
+    const response = await fetch('/api/predictions', {
+      cache: 'no-store',
+      headers: { 'x-admin-pin': adminPin },
+    })
+
+    if (!response.ok) {
+      return null
+    }
+
+    return response.json() as Promise<PredictionSlip[]>
+  } catch (error) {
+    console.error('No se pudieron cargar predicciones admin', error)
+    return null
+  }
+}
+
 async function submitPublicPrediction(body: {
   accessCode: string
   displayName: string
@@ -3382,12 +3421,14 @@ function PredictionGroup({
   group,
   matches,
   onChange,
+  pointsByMatch = {},
   predictions,
   disabled = false,
 }: {
   group: string
   matches: Match[]
   onChange: (matchId: string, side: 'homeScore' | 'awayScore', value: string) => void
+  pointsByMatch?: Record<string, number>
   predictions: Record<string, MatchPrediction>
   disabled?: boolean
 }) {
@@ -3399,9 +3440,10 @@ function PredictionGroup({
       <div className="prediction-fixtures">
         {matches.map((match) => {
           const prediction = predictions[match.id]
+          const points = pointsByMatch[match.id] ?? 0
 
           return (
-            <div className="prediction-row" key={match.id}>
+            <div className={`prediction-row ${scoreClassName(points)}`} key={match.id}>
               <time>{formatDate(match.date)}</time>
               <span>{teamLabel(match.home)}</span>
               <input
@@ -3422,11 +3464,33 @@ function PredictionGroup({
                 value={Number.isNaN(prediction?.awayScore) || prediction?.awayScore === undefined ? '' : prediction.awayScore}
               />
               <span>{teamLabel(match.away)}</span>
+              {points > 0 && <strong className="prediction-points">+{points}</strong>}
             </div>
           )
         })}
       </div>
     </article>
+  )
+}
+
+function scoreClassName(points: number) {
+  if (points >= 6) return 'prediction-row-score-high'
+  if (points >= 3) return 'prediction-row-score-medium'
+  if (points > 0) return 'prediction-row-score-low'
+  return ''
+}
+
+function ScoreBonusList({ bonuses }: { bonuses: ScoreBreakdown[] }) {
+  if (bonuses.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="score-bonus-list">
+      {bonuses.map((bonus) => (
+        <span key={bonus.label}>{bonus.label} +{bonus.points}</span>
+      ))}
+    </div>
   )
 }
 
