@@ -1359,6 +1359,21 @@ tbody tr:last-child td {
   padding: 6px 10px;
 }
 
+.score-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 16px;
+}
+
+.score-summary span {
+  border-radius: 8px;
+  background: #eef3f0;
+  color: #12343b;
+  font-size: 0.86rem;
+  padding: 8px 10px;
+}
+
 .prediction-row:last-child {
   border-bottom: 0;
 }

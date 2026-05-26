@@ -1248,8 +1248,17 @@ type="button"
                       <article className="panel" key={prediction.participantId}>
                         <div className="panel-title">
                           <h3>{participant?.name ?? 'Participante'}</h3>
-                          <span>{visibleMatches.length} marcadores visibles</span>
+                          <span>
+                            {visibleMatches.length} marcadores visibles ·{' '}
+                            {scoringDetailsByParticipant[prediction.participantId]?.bonuses.reduce(
+                              (sum, bonus) => sum + bonus.points,
+                              Object.values(scoringDetailsByParticipant[prediction.participantId]?.matches ?? {})
+                                .reduce((sum, points) => sum + points, 0),
+                            ) ?? 0}{' '}
+                            pts
+                          </span>
                         </div>
+                        <ScoreSummary prediction={prediction} state={scoringTournamentState} />
 
                         {closedPredictionStages.includes('Grupo') && (
                           <>
@@ -1351,10 +1360,21 @@ type="button"
                     onChange={async (event) => {
                       const nextPhase = event.target.value
                       if (!isPredictionPhase(nextPhase)) return
+                      const previousPhase = predictionPhase
+                      const confirmed = window.confirm(
+                        `Vas a cambiar la fase a "${nextPhase}". Esto puede hacer visibles pronosticos publicos. ¿Continuar?`,
+                      )
+
+                      if (!confirmed) {
+                        event.target.value = previousPhase
+                        return
+                      }
 
                       const saved = await savePredictionPhase(nextPhase, adminPinInput)
                       if (saved) {
                         setPredictionPhase(nextPhase)
+                      } else {
+                        event.target.value = previousPhase
                       }
                     }}
                     value={predictionPhase}
@@ -3490,6 +3510,20 @@ function ScoreBonusList({ bonuses }: { bonuses: ScoreBreakdown[] }) {
       {bonuses.map((bonus) => (
         <span key={bonus.label}>{bonus.label} +{bonus.points}</span>
       ))}
+    </div>
+  )
+}
+
+function ScoreSummary({ prediction, state }: { prediction: PredictionSlip; state: TournamentState }) {
+  const breakdown = scorePredictionDetails(prediction, state)
+  const matchPoints = Object.values(breakdown.matches).reduce((sum, points) => sum + points, 0)
+  const bonusPoints = breakdown.bonuses.reduce((sum, bonus) => sum + bonus.points, 0)
+
+  return (
+    <div className="score-summary">
+      <span>Partidos: <strong>{matchPoints}</strong></span>
+      <span>Bonus: <strong>{bonusPoints}</strong></span>
+      <span>Total: <strong>{matchPoints + bonusPoints}</strong></span>
     </div>
   )
 }
