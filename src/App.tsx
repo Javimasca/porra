@@ -4,10 +4,11 @@ import autoTable from 'jspdf-autotable'
 import './App.css'
 import { participants as initialParticipants, predictions as initialPredictions, tournamentState as initialTournamentState } from './data/mockData'
 import { buildLeaderboard } from './domain/scoring'
+import { getClosedPredictionStages, isPredictionPhase, predictionPhases, type PredictionPhase } from './domain/phases'
 import type { Match, MatchPrediction, Participant, ParticipantStatus, PredictionSlip, TournamentState } from './domain/types'
 
 
-const publicTabs = ['Formulario', 'Cuadro', 'Clasificacion', 'Reglas'] as const
+const publicTabs = ['Formulario', 'Pronosticos', 'Cuadro', 'Clasificacion', 'Reglas'] as const
 const adminTabs = ['Panel', 'Solicitudes', 'Cuadro', 'Participantes', 'Predicciones', 'Eliminatorias', 'Resultados', 'Clasificacion', 'Reglas'] as const
 const tabs = [...publicTabs, ...adminTabs] as const
 type Tab = (typeof tabs)[number]
@@ -28,17 +29,7 @@ type GroupTeamStanding = TeamStanding & { group: string }
 const participantsStorageKey = 'porra-2026-participants'
 const predictionsStorageKey = 'porra-2026-predictions'
 const tournamentStorageKey = 'porra-2026-tournament'
-type PredictionPhase =
-  | 'preGroups'
-  | 'groupsClosed'
-  | 'Ronda de 32'
-  | 'Octavos'
-  | 'Cuartos'
-  | 'Semifinal'
-  | 'Final'
-  | 'closed'
-
-const predictionPhase: PredictionPhase = 'preGroups'
+const defaultPredictionPhase: PredictionPhase = 'preGroups'
 const groups = 'ABCDEFGHIJKL'.split('')
 const knockoutStages = ['Ronda de 32', 'Octavos', 'Cuartos', 'Semifinal', 'Final'] as const
 const allTeams = Array.from(
@@ -157,12 +148,14 @@ function App() {
   const [adminPinInput, setAdminPinInput] = useState('')
   const [adminError, setAdminError] = useState('')
   const [apiReady, setApiReady] = useState(false)
+  const [predictionPhase, setPredictionPhase] = useState<PredictionPhase>(defaultPredictionPhase)
   const [participants, setParticipants] = useState<Participant[]>(loadParticipants)
   const [predictions, setPredictions] = useState<PredictionSlip[]>(loadPredictions)
   const [tournamentState, setTournamentState] = useState<TournamentState>(loadTournamentState)
   const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null)
   const [reviewParticipantId, setReviewParticipantId] = useState<string | null>(null)
   const [selectedPredictionParticipantId, setSelectedPredictionParticipantId] = useState('')
+  const [selectedPublicPredictionParticipantId, setSelectedPublicPredictionParticipantId] = useState('')
   const [selectedKnockoutParticipantId, setSelectedKnockoutParticipantId] = useState('')
   const [activeKnockoutStage, setActiveKnockoutStage] = useState<(typeof knockoutStages)[number]>('Ronda de 32')
   const [matchPredictions, setMatchPredictions] = useState<Record<string, MatchPrediction>>({})
@@ -212,10 +205,11 @@ function App() {
   useEffect(() => {
     async function loadFromApi() {
       try {
-        const [participantsResponse, predictionsResponse, tournamentResponse] = await Promise.all([
+        const [participantsResponse, predictionsResponse, tournamentResponse, phaseResponse] = await Promise.all([
           fetch('/api/participants', { cache: 'no-store' }),
           fetch('/api/predictions', { cache: 'no-store' }),
           fetch('/api/tournament', { cache: 'no-store' }),
+          fetch('/api/settings/prediction-phase', { cache: 'no-store' }),
         ])
 
         if (!participantsResponse.ok) {
@@ -231,10 +225,11 @@ if (!tournamentResponse.ok) {
 }
         
 
-        const [apiParticipants, apiPredictions, apiTournament] = await Promise.all([
+        const [apiParticipants, apiPredictions, apiTournament, apiPhase] = await Promise.all([
           participantsResponse.json(),
           predictionsResponse.json(),
           tournamentResponse.json(),
+          phaseResponse.ok ? phaseResponse.json() : Promise.resolve(null),
         ])
 
         if (Array.isArray(apiParticipants)) {
@@ -254,6 +249,11 @@ if (!tournamentResponse.ok) {
             })),
           })
         }
+
+        if (isPredictionPhase(apiPhase?.predictionPhase)) {
+          setPredictionPhase(apiPhase.predictionPhase)
+        }
+
         setApiReady(true)
               
       } catch (error) {
@@ -356,6 +356,13 @@ if (!tournamentResponse.ok) {
     [participants, predictions, scoringTournamentState],
   )
   const visibleTabs = mode === 'publico' ? publicTabs : adminTabs
+  const closedPredictionStages = getClosedPredictionStages(predictionPhase)
+  const publicVisiblePredictions = predictions.filter((prediction) => prediction.locked)
+  const filteredPublicPredictions = selectedPublicPredictionParticipantId
+    ? publicVisiblePredictions.filter(
+        (prediction) => prediction.participantId === selectedPublicPredictionParticipantId,
+      )
+    : publicVisiblePredictions
   const selectedPrediction = predictions.find(
     (prediction) => prediction.participantId === selectedPredictionParticipantId,
   )
@@ -1169,6 +1176,146 @@ type="button"
           </section>
         )}
 
+        {activeTab === 'Pronosticos' && (
+          <section>
+            <header className="section-header">
+              <div>
+                <p className="eyebrow">Transparencia</p>
+                <h2>Pronosticos visibles</h2>
+              </div>
+              <span className="fixture-count">
+                {closedPredictionStages.length === 0
+                  ? 'Sin fases cerradas'
+                  : closedPredictionStages.join(' · ')}
+              </span>
+            </header>
+
+            {closedPredictionStages.length === 0 ? (
+              <div className="panel">
+                <p>Los pronosticos de los participantes se mostraran cuando se cierre una fase.</p>
+              </div>
+            ) : (
+              <div className="prediction-public-list">
+                <div className="prediction-toolbar">
+                  <label>
+                    Participante
+                    <select
+                      onChange={(event) => setSelectedPublicPredictionParticipantId(event.target.value)}
+                      value={selectedPublicPredictionParticipantId}
+                    >
+                      <option value="">Todos</option>
+                      {publicVisiblePredictions.map((prediction) => {
+                        const participant = participants.find((item) => item.id === prediction.participantId)
+                        return (
+                          <option key={prediction.participantId} value={prediction.participantId}>
+                            {participant?.name ?? 'Participante'}
+                          </option>
+                        )
+                      })}
+                    </select>
+                  </label>
+                </div>
+
+                {filteredPublicPredictions.map((prediction) => {
+                    const participant = participants.find((item) => item.id === prediction.participantId)
+                    const visibleMatches = prediction.matches.filter((pick) => {
+                      const match = tournamentState.matches.find((item) => item.id === pick.matchId)
+                      return match ? closedPredictionStages.includes(match.stage) : false
+                    })
+                    const visiblePredictions = Object.fromEntries(
+                      visibleMatches.map((pick) => [pick.matchId, pick]),
+                    )
+
+                    return (
+                      <article className="panel" key={prediction.participantId}>
+                        <div className="panel-title">
+                          <h3>{participant?.name ?? 'Participante'}</h3>
+                          <span>{visibleMatches.length} marcadores visibles</span>
+                        </div>
+
+                        {closedPredictionStages.includes('Grupo') && (
+                          <>
+                            <section className="prediction-meta">
+                              <div className="meta-card">
+                                <h3>Bonus finales</h3>
+                                <div className="meta-grid review-summary-grid">
+                                  <div>
+                                    <strong>Campeon</strong>
+                                    <p>{prediction.champion || '-'}</p>
+                                  </div>
+                                  <div>
+                                    <strong>Maximo goleador</strong>
+                                    <p>{prediction.topScorer || '-'}</p>
+                                  </div>
+                                  <div>
+                                    <strong>MVP</strong>
+                                    <p>{prediction.mvp || '-'}</p>
+                                  </div>
+                                </div>
+                                <div className="review-badges">
+                                  <div>
+                                    <strong>Semifinalistas</strong>
+                                    <p>{prediction.semifinalists.join(' · ') || '-'}</p>
+                                  </div>
+                                  <div>
+                                    <strong>Mejores terceros</strong>
+                                    <p>{prediction.bestThirds.join(' · ') || '-'}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </section>
+
+                            <div className="group-picks-grid">
+                              {groups.map((group) => (
+                                <div className="group-pick" key={group}>
+                                  <h4>Grupo <span translate="no">{group}</span></h4>
+                                  <p><strong>Primero:</strong> {prediction.groupWinners[group] ?? '-'}</p>
+                                  <p>
+                                    <strong>Clasificados:</strong>{' '}
+                                    {(prediction.groupQualified[group] ?? []).join(' · ') || '-'}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="prediction-board">
+                              {groups.map((group) => (
+                                <PredictionGroup
+                                  disabled
+                                  group={group}
+                                  key={group}
+                                  matches={tournamentState.matches.filter(
+                                    (match) => match.stage === 'Grupo' && match.group === group,
+                                  )}
+                                  onChange={() => undefined}
+                                  predictions={visiblePredictions}
+                                />
+                              ))}
+                            </div>
+                          </>
+                        )}
+
+                        {closedPredictionStages
+                          .filter((stage) => stage !== 'Grupo')
+                          .map((stage) => (
+                            <div className="prediction-board" key={stage}>
+                              <PredictionGroup
+                                disabled
+                                group={stage}
+                                matches={tournamentState.matches.filter((match) => match.stage === stage)}
+                                onChange={() => undefined}
+                                predictions={visiblePredictions}
+                              />
+                            </div>
+                          ))}
+                      </article>
+                    )
+                  })}
+              </div>
+            )}
+          </section>
+        )}
+
         {activeTab === 'Panel' && (
           <>
             <header className="section-header">
@@ -1176,7 +1323,28 @@ type="button"
                 <p className="eyebrow">Estado general</p>
                 <h2>Ranking y control del torneo</h2>
               </div>
-              <button className="primary-action" type="button">Recalcular puntos</button>
+              <div className="header-actions">
+                <label>
+                  Fase de pronosticos
+                  <select
+                    onChange={async (event) => {
+                      const nextPhase = event.target.value
+                      if (!isPredictionPhase(nextPhase)) return
+
+                      const saved = await savePredictionPhase(nextPhase, adminPinInput)
+                      if (saved) {
+                        setPredictionPhase(nextPhase)
+                      }
+                    }}
+                    value={predictionPhase}
+                  >
+                    {predictionPhases.map((phase) => (
+                      <option key={phase} value={phase}>{phase}</option>
+                    ))}
+                  </select>
+                </label>
+                <button className="primary-action" type="button">Recalcular puntos</button>
+              </div>
             </header>
 
             <section className="metric-grid" aria-label="Resumen">
@@ -3068,7 +3236,8 @@ async function syncApi(path: string, body: unknown, adminPin?: string) {
 
     if (!response.ok) {
       const text = await response.text()
-throw new Error(`HTTP ${response.status}: ${text}`)
+      console.warn(`No se pudo sincronizar ${path}: HTTP ${response.status}`, text)
+      return null
     }
 
     return response.json()
@@ -3122,6 +3291,30 @@ async function submitPublicPrediction(body: {
   } catch (error) {
     console.error('No se pudo guardar la prediccion publica', error)
     return null
+  }
+}
+
+async function savePredictionPhase(predictionPhase: PredictionPhase, adminPin: string) {
+  try {
+    const response = await fetch('/api/settings/prediction-phase', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(adminPin ? { 'x-admin-pin': adminPin } : {}),
+      },
+      body: JSON.stringify({ predictionPhase }),
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`HTTP ${response.status}: ${text}`)
+    }
+
+    return true
+  } catch (error) {
+    console.error('No se pudo guardar la fase de pronosticos', error)
+    window.alert('No se pudo guardar la fase. Revisa el PIN admin.')
+    return false
   }
 }
 
