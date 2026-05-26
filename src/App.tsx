@@ -152,6 +152,7 @@ function App() {
   const [predictionPhase, setPredictionPhase] = useState<PredictionPhase>(defaultPredictionPhase)
   const [participants, setParticipants] = useState<Participant[]>(loadParticipants)
   const [predictions, setPredictions] = useState<PredictionSlip[]>(loadPredictions)
+  const [publicPredictions, setPublicPredictions] = useState<PredictionSlip[]>([])
   const [tournamentState, setTournamentState] = useState<TournamentState>(loadTournamentState)
   const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null)
   const [reviewParticipantId, setReviewParticipantId] = useState<string | null>(null)
@@ -238,7 +239,7 @@ if (!tournamentResponse.ok) {
         }
 
         if (Array.isArray(apiPredictions)) {
-          setPredictions(apiPredictions)
+          setPublicPredictions(apiPredictions)
         }
 
         if (Array.isArray(apiTournament.matches)) {
@@ -358,7 +359,7 @@ if (!tournamentResponse.ok) {
   )
   const visibleTabs = mode === 'publico' ? publicTabs : adminTabs
   const closedPredictionStages = getClosedPredictionStages(predictionPhase)
-  const publicVisiblePredictions = predictions.filter((prediction) => prediction.locked)
+  const publicVisiblePredictions = publicPredictions.filter((prediction) => prediction.locked)
   const filteredPublicPredictions = selectedPublicPredictionParticipantId
     ? publicVisiblePredictions.filter(
         (prediction) => prediction.participantId === selectedPublicPredictionParticipantId,
@@ -366,12 +367,12 @@ if (!tournamentResponse.ok) {
     : publicVisiblePredictions
   const scoringDetailsByParticipant = useMemo(
     () => Object.fromEntries(
-      predictions.map((prediction) => [
+      [...predictions, ...publicPredictions].map((prediction) => [
         prediction.participantId,
         scorePredictionDetails(prediction, scoringTournamentState),
       ]),
     ),
-    [predictions, scoringTournamentState],
+    [predictions, publicPredictions, scoringTournamentState],
   )
   const selectedPrediction = predictions.find(
     (prediction) => prediction.participantId === selectedPredictionParticipantId,
@@ -416,6 +417,28 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     })
     setPublicFormConfirmation(null)
     setPublicFormEditMode(false)
+  }
+  const loadMyPrediction = async (accessCode: string) => {
+    const result = await fetchMyPrediction(accessCode)
+    if (!result) return
+
+    setParticipants((current) =>
+      current.some((participant) => participant.id === result.participant.id)
+        ? current.map((participant) =>
+            participant.id === result.participant.id ? result.participant : participant,
+          )
+        : [...current, result.participant],
+    )
+
+    if (result.prediction) {
+      setPredictions((current) =>
+        current.some((prediction) => prediction.participantId === result.prediction?.participantId)
+          ? current.map((prediction) =>
+              prediction.participantId === result.prediction?.participantId ? result.prediction : prediction,
+            )
+          : [...current, result.prediction],
+      )
+    }
   }
   const savePublicPrediction = async (locked: boolean) => {
     if (!publicParticipant) return
@@ -603,8 +626,9 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
                       autoCorrect="off"
                       spellCheck={false}
                       onChange={(event) => setPublicForm((form) => ({ ...form, accessCode: event.target.value }))}
-                      onKeyDown={(event) => {
+                      onKeyDown={async (event) => {
                         if (event.key === 'Enter' && publicParticipant) {
+                          await loadMyPrediction(publicForm.accessCode)
                           setPublicFormStep('form')
                         }
                       }}
@@ -625,7 +649,8 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
                       </div>
                       <button
                         className="primary-action"
-                        onClick={() => {
+                        onClick={async () => {
+                          await loadMyPrediction(publicForm.accessCode)
                           setPublicFormStep('form')
                         }}
                         type="button"
@@ -3317,6 +3342,22 @@ async function loadAdminPredictions(adminPin: string) {
     return response.json() as Promise<PredictionSlip[]>
   } catch (error) {
     console.error('No se pudieron cargar predicciones admin', error)
+    return null
+  }
+}
+
+async function fetchMyPrediction(accessCode: string) {
+  try {
+    const response = await fetch('/api/predictions/me', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessCode }),
+    })
+
+    if (!response.ok) return null
+    return response.json() as Promise<{ participant: Participant; prediction: PredictionSlip | null }>
+  } catch (error) {
+    console.error('No se pudo cargar la prediccion del participante', error)
     return null
   }
 }
