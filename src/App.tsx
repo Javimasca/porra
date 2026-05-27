@@ -1321,6 +1321,15 @@ type="button"
                   </label>
                 </div>
 
+                {filteredPublicPredictions.length === 0 && (
+                  <div className="panel">
+                    <p>
+                      No hay pronosticos visibles para este filtro. Comprueba que la fase este cerrada y que existan
+                      porras definitivas.
+                    </p>
+                  </div>
+                )}
+
                 {filteredPublicPredictions.map((prediction) => {
                     const participant = participants.find((item) => item.id === prediction.participantId)
                     const visibleMatches = prediction.matches.filter((pick) => {
