@@ -861,7 +861,9 @@ type="button"
                           value={publicForm.alias}
                         />
                       </label>
-                      <ScoreBonusList bonuses={scoringDetailsByParticipant[publicParticipantPrediction.participantId]?.bonuses ?? []} />
+                      {publicParticipantPrediction && (
+                        <ScoreBonusList bonuses={scoringDetailsByParticipant[publicParticipantPrediction.participantId]?.bonuses ?? []} />
+                      )}
                     </div>
 
                     <div className="meta-card">
