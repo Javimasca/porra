@@ -226,18 +226,13 @@ function App() {
   useEffect(() => {
     async function loadFromApi() {
       try {
-        const [participantsResponse, predictionsResponse, tournamentResponse, phaseResponse] = await Promise.all([
-          fetch('/api/participants', { cache: 'no-store' }),
+        const [predictionsResponse, tournamentResponse, phaseResponse] = await Promise.all([
           fetch('/api/predictions/public', { cache: 'no-store' }),
           fetch('/api/tournament', { cache: 'no-store' }),
           fetch('/api/settings/prediction-phase', { cache: 'no-store' }),
         ])
 
-        if (!participantsResponse.ok) {
-  throw new Error(`Participants API unavailable: ${participantsResponse.status}`)
-}
-
-if (!predictionsResponse.ok) {
+        if (!predictionsResponse.ok) {
   throw new Error(`Predictions API unavailable: ${predictionsResponse.status}`)
 }
 
@@ -246,16 +241,11 @@ if (!tournamentResponse.ok) {
 }
         
 
-        const [apiParticipants, apiPredictions, apiTournament, apiPhase] = await Promise.all([
-          participantsResponse.json(),
+        const [apiPredictions, apiTournament, apiPhase] = await Promise.all([
           predictionsResponse.json(),
           tournamentResponse.json(),
           phaseResponse.ok ? phaseResponse.json() : Promise.resolve(null),
         ])
-
-        if (Array.isArray(apiParticipants)) {
-          setParticipants(apiParticipants.map(normalizeParticipantAccessCode))
-        }
 
         if (Array.isArray(apiPredictions)) {
           setPublicPredictions(apiPredictions.map(normalizePredictionSlip))
@@ -284,6 +274,25 @@ if (!tournamentResponse.ok) {
 
     loadFromApi()
   }, [])
+
+  useEffect(() => {
+    const accessCode = publicForm.accessCode.trim()
+    if (accessCode.length < 4) return
+    if (publicParticipant) return
+
+    const timeout = window.setTimeout(async () => {
+      const participant = await lookupParticipant(accessCode)
+      if (!participant) return
+
+      setParticipants((current) =>
+        current.some((item) => item.id === participant.id)
+          ? current.map((item) => (item.id === participant.id ? participant : item))
+          : [...current, participant],
+      )
+    }, 250)
+
+    return () => window.clearTimeout(timeout)
+  }, [publicForm.accessCode, publicParticipant])
 
   useEffect(() => {
     localStorage.setItem(participantsStorageKey, JSON.stringify(participants))
@@ -576,6 +585,10 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
 
               setAdminAuthenticated(true)
               setAdminError('')
+              const adminParticipants = await loadAdminParticipants(adminPinInput)
+              if (adminParticipants) {
+                setParticipants(adminParticipants)
+              }
               const adminPredictions = await loadAdminPredictions(adminPinInput)
               if (adminPredictions) {
                 setPredictions(adminPredictions)
@@ -3366,6 +3379,38 @@ async function loadAdminPredictions(adminPin: string) {
     return Array.isArray(predictions) ? predictions.map(normalizePredictionSlip) : null
   } catch (error) {
     console.error('No se pudieron cargar predicciones admin', error)
+    return null
+  }
+}
+
+async function loadAdminParticipants(adminPin: string) {
+  try {
+    const response = await fetch('/api/participants', {
+      cache: 'no-store',
+      headers: { 'x-admin-pin': adminPin },
+    })
+
+    if (!response.ok) return null
+    const participants = await response.json()
+    return Array.isArray(participants) ? participants.map(normalizeParticipantAccessCode) : null
+  } catch (error) {
+    console.error('No se pudieron cargar participantes admin', error)
+    return null
+  }
+}
+
+async function lookupParticipant(accessCode: string) {
+  try {
+    const response = await fetch('/api/participants/lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessCode }),
+    })
+
+    if (!response.ok) return null
+    return normalizeParticipantAccessCode(await response.json())
+  } catch (error) {
+    console.error('No se pudo buscar el participante', error)
     return null
   }
 }

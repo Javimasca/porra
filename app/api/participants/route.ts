@@ -24,7 +24,10 @@ function isParticipant(item: unknown): item is {
   )
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const unauthorized = requireAdmin(request)
+  if (unauthorized) return unauthorized
+
   try {
     const prisma = getPrisma()
     const participants = await prisma.participant.findMany({
