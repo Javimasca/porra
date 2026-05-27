@@ -118,9 +118,28 @@ function loadPredictions() {
   }
 
   try {
-    return JSON.parse(savedPredictions) as PredictionSlip[]
+    return (JSON.parse(savedPredictions) as PredictionSlip[]).map(normalizePredictionSlip)
   } catch {
     return initialPredictions
+  }
+}
+
+function normalizePredictionSlip(prediction: Partial<PredictionSlip>): PredictionSlip {
+  return {
+    participantId: prediction.participantId ?? '',
+    verificationCode: prediction.verificationCode ?? '',
+    locked: prediction.locked ?? false,
+    reopenRequested: prediction.reopenRequested ?? false,
+    champion: prediction.champion ?? '',
+    semifinalists: Array.isArray(prediction.semifinalists) ? prediction.semifinalists : [],
+    topScorer: prediction.topScorer ?? '',
+    mvp: prediction.mvp ?? '',
+    groupWinners: prediction.groupWinners ?? {},
+    groupQualified: prediction.groupQualified ?? {},
+    bestThirds: Array.isArray(prediction.bestThirds) ? prediction.bestThirds : [],
+    matches: Array.isArray(prediction.matches) ? prediction.matches : [],
+    submittedAt: prediction.submittedAt,
+    pdfReceived: prediction.pdfReceived ?? false,
   }
 }
 
@@ -239,7 +258,7 @@ if (!tournamentResponse.ok) {
         }
 
         if (Array.isArray(apiPredictions)) {
-          setPublicPredictions(apiPredictions)
+          setPublicPredictions(apiPredictions.map(normalizePredictionSlip))
         }
 
         if (Array.isArray(apiTournament.matches)) {
@@ -434,7 +453,9 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
       setPredictions((current) =>
         current.some((prediction) => prediction.participantId === result.prediction?.participantId)
           ? current.map((prediction) =>
-              prediction.participantId === result.prediction?.participantId ? result.prediction : prediction,
+              prediction.participantId === result.prediction?.participantId
+                ? normalizePredictionSlip(result.prediction)
+                : prediction,
             )
           : [...current, result.prediction],
       )
@@ -466,7 +487,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     if (!saved) return
 
     const nextPrediction = {
-      ...saved.prediction,
+      ...normalizePredictionSlip(saved.prediction),
       submittedAt: locked ? new Date().toISOString() : undefined,
       pdfReceived: false,
     }
@@ -3339,7 +3360,8 @@ async function loadAdminPredictions(adminPin: string) {
       return null
     }
 
-    return response.json() as Promise<PredictionSlip[]>
+    const predictions = await response.json()
+    return Array.isArray(predictions) ? predictions.map(normalizePredictionSlip) : null
   } catch (error) {
     console.error('No se pudieron cargar predicciones admin', error)
     return null
@@ -3355,7 +3377,11 @@ async function fetchMyPrediction(accessCode: string) {
     })
 
     if (!response.ok) return null
-    return response.json() as Promise<{ participant: Participant; prediction: PredictionSlip | null }>
+    const result = await response.json() as { participant: Participant; prediction: Partial<PredictionSlip> | null }
+    return {
+      participant: result.participant,
+      prediction: result.prediction ? normalizePredictionSlip(result.prediction) : null,
+    }
   } catch (error) {
     console.error('No se pudo cargar la prediccion del participante', error)
     return null
