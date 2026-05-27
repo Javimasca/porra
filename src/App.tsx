@@ -177,6 +177,7 @@ function App() {
   const [reviewParticipantId, setReviewParticipantId] = useState<string | null>(null)
   const [selectedPredictionParticipantId, setSelectedPredictionParticipantId] = useState('')
   const [selectedPublicPredictionParticipantId, setSelectedPublicPredictionParticipantId] = useState('')
+  const [selectedPublicPredictionScope, setSelectedPublicPredictionScope] = useState('all')
   const [selectedKnockoutParticipantId, setSelectedKnockoutParticipantId] = useState('')
   const [activeKnockoutStage, setActiveKnockoutStage] = useState<(typeof knockoutStages)[number]>('Ronda de 32')
   const [matchPredictions, setMatchPredictions] = useState<Record<string, MatchPrediction>>({})
@@ -393,6 +394,14 @@ if (!tournamentResponse.ok) {
         (prediction) => prediction.participantId === selectedPublicPredictionParticipantId,
       )
     : publicVisiblePredictions
+  const visibleGroups = selectedPublicPredictionScope.startsWith('group-')
+    ? [selectedPublicPredictionScope.replace('group-', '')]
+    : groups
+  const visibleKnockoutStages = selectedPublicPredictionScope === 'all'
+    ? closedPredictionStages.filter((stage) => stage !== 'Grupo')
+    : closedPredictionStages.includes(selectedPublicPredictionScope as Match['stage'])
+      ? [selectedPublicPredictionScope as Match['stage']]
+      : []
   const scoringDetailsByParticipant = useMemo(
     () => Object.fromEntries(
       [...predictions, ...publicPredictions].map((prediction) => [
@@ -1293,6 +1302,23 @@ type="button"
                       })}
                     </select>
                   </label>
+                  <label>
+                    Fase / grupo
+                    <select
+                      onChange={(event) => setSelectedPublicPredictionScope(event.target.value)}
+                      value={selectedPublicPredictionScope}
+                    >
+                      <option value="all">Todo visible</option>
+                      {closedPredictionStages.includes('Grupo') && groups.map((group) => (
+                        <option key={group} value={`group-${group}`}>Grupo {group}</option>
+                      ))}
+                      {closedPredictionStages
+                        .filter((stage) => stage !== 'Grupo')
+                        .map((stage) => (
+                          <option key={stage} value={stage}>{stage}</option>
+                        ))}
+                    </select>
+                  </label>
                 </div>
 
                 {filteredPublicPredictions.map((prediction) => {
@@ -1323,7 +1349,8 @@ type="button"
 
                         {closedPredictionStages.includes('Grupo') && (
                           <>
-                            <section className="prediction-meta">
+                            {selectedPublicPredictionScope === 'all' && (
+                              <section className="prediction-meta">
                               <div className="meta-card">
                                 <h3>Bonus finales</h3>
                                 <div className="meta-grid review-summary-grid">
@@ -1352,10 +1379,11 @@ type="button"
                                 </div>
                                 <ScoreBonusList bonuses={scoringDetailsByParticipant[prediction.participantId]?.bonuses ?? []} />
                               </div>
-                            </section>
+                              </section>
+                            )}
 
                             <div className="group-picks-grid">
-                              {groups.map((group) => (
+                              {visibleGroups.map((group) => (
                                 <div className="group-pick" key={group}>
                                   <h4>Grupo <span translate="no">{group}</span></h4>
                                   <p><strong>Primero:</strong> {prediction.groupWinners[group] ?? '-'}</p>
@@ -1368,7 +1396,7 @@ type="button"
                             </div>
 
                             <div className="prediction-board">
-                              {groups.map((group) => (
+                              {visibleGroups.map((group) => (
                                 <PredictionGroup
                                   disabled
                                   group={group}
@@ -1386,7 +1414,7 @@ type="button"
                         )}
 
                         {closedPredictionStages
-                          .filter((stage) => stage !== 'Grupo')
+                          .filter((stage) => visibleKnockoutStages.includes(stage))
                           .map((stage) => (
                             <div className="prediction-board" key={stage}>
                               <PredictionGroup
@@ -1434,6 +1462,8 @@ type="button"
                       const saved = await savePredictionPhase(nextPhase, adminPinInput)
                       if (saved) {
                         setPredictionPhase(nextPhase)
+                        const refreshedPublicPredictions = await loadPublicPredictions()
+                        setPublicPredictions(refreshedPublicPredictions)
                       } else {
                         event.target.value = previousPhase
                       }
@@ -3396,6 +3426,18 @@ async function loadAdminParticipants(adminPin: string) {
   } catch (error) {
     console.error('No se pudieron cargar participantes admin', error)
     return null
+  }
+}
+
+async function loadPublicPredictions() {
+  try {
+    const response = await fetch('/api/predictions/public', { cache: 'no-store' })
+    if (!response.ok) return []
+    const predictions = await response.json()
+    return Array.isArray(predictions) ? predictions.map(normalizePredictionSlip) : []
+  } catch (error) {
+    console.error('No se pudieron cargar predicciones publicas', error)
+    return []
   }
 }
 
