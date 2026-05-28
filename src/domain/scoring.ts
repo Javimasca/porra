@@ -8,14 +8,6 @@ import type {
   TournamentState,
 } from './types'
 
-const knockoutExactPoints: Record<string, number> = {
-  'Ronda de 32': 4,
-  Octavos: 6,
-  Cuartos: 6,
-  Semifinal: 8,
-  Final: 10,
-}
-
 const groupWinnerPointsTable = [0, 1, 3, 5, 8, 11, 13, 15, 18, 21, 23, 26, 30]
 
 const knockoutSignBonusTables: Record<string, Record<number, number>> = {
@@ -132,14 +124,27 @@ function scoreGroupMatch(prediction: MatchPrediction, match: Match) {
 }
 
 function scoreKnockoutMatch(prediction: MatchPrediction, match: Match) {
-  const signPoints = knockoutSignPoints(prediction, match)
-  const exactPoints = exactScore(prediction, match) ? knockoutExactPoints[match.stage] ?? 5 : 0
-  return signPoints + exactPoints
+  if (prediction.homeScore === prediction.awayScore) {
+    const drawPoints = match.homeScore === match.awayScore
+      ? exactScore(prediction, match) ? 3 : 1
+      : 0
+    const penaltyPoints = match.homeScore === match.awayScore && prediction.penaltyWinner === match.penaltyWinner
+      ? 1
+      : 0
+
+    return drawPoints + penaltyPoints
+  }
+
+  if (exactScore(prediction, match)) {
+    return 3
+  }
+
+  return sameSign(prediction, match) ? 2 : 0
 }
 
 function knockoutSignPoints(prediction: MatchPrediction, match: Match) {
   if (prediction.homeScore === prediction.awayScore && match.homeScore === match.awayScore) {
-    return prediction.penaltyWinner === match.penaltyWinner ? 2 : 1
+    return prediction.penaltyWinner === match.penaltyWinner ? 2 : 0
   }
 
   return sameSign(prediction, match) ? 2 : 0

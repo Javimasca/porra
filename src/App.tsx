@@ -7,11 +7,15 @@ import { buildLeaderboard, scorePredictionDetails } from './domain/scoring'
 import { getClosedPredictionStages, isPredictionPhase, predictionPhases, type PredictionPhase } from './domain/phases'
 import type { Match, MatchPrediction, Participant, ParticipantStatus, PredictionSlip, ScoreBreakdown, TournamentState } from './domain/types'
 
+type AutoTableDocument = jsPDF & {
+  lastAutoTable?: {
+    finalY: number
+  }
+}
 
 const publicTabs = ['Formulario', 'Pronosticos', 'Cuadro', 'Clasificacion', 'Reglas'] as const
 const adminTabs = ['Panel', 'Solicitudes', 'Cuadro', 'Participantes', 'Predicciones', 'Eliminatorias', 'Resultados', 'Clasificacion', 'Reglas'] as const
-const tabs = [...publicTabs, ...adminTabs] as const
-type Tab = (typeof tabs)[number]
+type Tab = (typeof publicTabs)[number] | (typeof adminTabs)[number]
 type TeamStanding = {
   team: string
   group?: string
@@ -317,8 +321,14 @@ if (!tournamentResponse.ok) {
   }, [adminAuthenticated, adminPinInput, apiReady, tournamentState])
 
   useEffect(() => {
+    let cancelled = false
+
     if (!selectedPredictionParticipantId) {
-      setMatchPredictions({})
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setMatchPredictions({})
+        }
+      })
       return
     }
 
@@ -326,23 +336,39 @@ if (!tournamentResponse.ok) {
       (prediction) => prediction.participantId === selectedPredictionParticipantId,
     )
 
-    setMatchPredictions(
-      Object.fromEntries((savedPrediction?.matches ?? []).map((prediction) => [prediction.matchId, prediction])),
-    )
-    setPredictionMeta({
-      champion: savedPrediction?.champion ?? '',
-      topScorer: savedPrediction?.topScorer ?? '',
-      mvp: savedPrediction?.mvp ?? '',
-      semifinalists: savedPrediction?.semifinalists ?? [],
-      groupWinners: savedPrediction?.groupWinners ?? {},
-      groupQualified: savedPrediction?.groupQualified ?? {},
-      bestThirds: savedPrediction?.bestThirds ?? [],
+    queueMicrotask(() => {
+      if (cancelled) {
+        return
+      }
+
+      setMatchPredictions(
+        Object.fromEntries((savedPrediction?.matches ?? []).map((prediction) => [prediction.matchId, prediction])),
+      )
+      setPredictionMeta({
+        champion: savedPrediction?.champion ?? '',
+        topScorer: savedPrediction?.topScorer ?? '',
+        mvp: savedPrediction?.mvp ?? '',
+        semifinalists: savedPrediction?.semifinalists ?? [],
+        groupWinners: savedPrediction?.groupWinners ?? {},
+        groupQualified: savedPrediction?.groupQualified ?? {},
+        bestThirds: savedPrediction?.bestThirds ?? [],
+      })
     })
+
+    return () => {
+      cancelled = true
+    }
   }, [predictions, selectedPredictionParticipantId])
 
   useEffect(() => {
+    let cancelled = false
+
     if (!selectedKnockoutParticipantId) {
-      setKnockoutPredictions({})
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setKnockoutPredictions({})
+        }
+      })
       return
     }
 
@@ -350,9 +376,19 @@ if (!tournamentResponse.ok) {
       (prediction) => prediction.participantId === selectedKnockoutParticipantId,
     )
 
-    setKnockoutPredictions(
-      Object.fromEntries((savedPrediction?.matches ?? []).map((prediction) => [prediction.matchId, prediction])),
-    )
+    queueMicrotask(() => {
+      if (cancelled) {
+        return
+      }
+
+      setKnockoutPredictions(
+        Object.fromEntries((savedPrediction?.matches ?? []).map((prediction) => [prediction.matchId, prediction])),
+      )
+    })
+
+    return () => {
+      cancelled = true
+    }
   }, [predictions, selectedKnockoutParticipantId])
 
   const paidPlayers = participants.filter((player) => player.status === 'validado')
@@ -374,7 +410,6 @@ if (!tournamentResponse.ok) {
           [
             ...qualification.groupWinners.filter((item) => item.group === group).map((item) => item.team),
             ...qualification.groupRunnersUp.filter((item) => item.group === group).map((item) => item.team),
-            ...qualification.bestThirds.filter((item) => item.group === group).map((item) => item.team),
           ],
         ]),
       ),
@@ -421,9 +456,6 @@ const initialPredictionClosed =
   predictionPhase === 'knockoutsOpen' ||
   predictionPhase === 'closed'
 
-const knockoutsPredictionOpen = predictionPhase === 'knockoutsOpen'
-
-const allPredictionsClosed = predictionPhase === 'closed'
 const currentKnockoutStage =
   predictionPhase === 'Ronda de 32' ||
   predictionPhase === 'Octavos' ||
@@ -995,7 +1027,7 @@ type="button"
                               <MultiTeamPicker
   disabled={publicParticipantPrediction?.locked}
   label="Clasificados"
-                                limit={3}
+                                limit={2}
                                 onChange={(teams) =>
                                   setPublicForm((form) => ({
                                     ...form,
@@ -2163,7 +2195,7 @@ type="button"
                         <MultiTeamPicker
   disabled={selectedPredictionIsLocked}
   label="Clasificados"
-                          limit={3}
+                          limit={2}
                           onChange={(teams) => {
   if (selectedPredictionIsLocked) {
     return
@@ -2246,21 +2278,16 @@ setMatchPredictions((current) => {
                       (prediction) => prediction.participantId === selectedKnockoutParticipantId,
                     )
                     const groupPredictions = existing?.matches.filter((prediction) => {
-
-                     const editableStagePredictions =
-  filledKnockoutPredictions.filter((prediction) => {
-    const match = tournamentState.matches.find(
-      (item) => item.id === prediction.matchId,
-    )
-
-    return (
-      match?.stage ===
-      (currentKnockoutStage ?? activeKnockoutStage)
-    )
-  })
                       const match = tournamentState.matches.find((item) => item.id === prediction.matchId)
                       return match?.stage === 'Grupo'
                     }) ?? []
+                    const editableStagePredictions = filledKnockoutPredictions.filter((prediction) => {
+                      const match = tournamentState.matches.find(
+                        (item) => item.id === prediction.matchId,
+                      )
+
+                      return match?.stage === (currentKnockoutStage ?? activeKnockoutStage)
+                    })
                     const nextPrediction: PredictionSlip = {
                       participantId: selectedKnockoutParticipantId,
                       locked: existing?.locked ?? true,
@@ -2500,7 +2527,7 @@ setMatchPredictions((current) => {
             </div>
             <div className="rules-grid">
               <Rule title="Fase de grupos" text="Signo 1-X-2: 1 punto. Resultado exacto: 3 puntos en total. Acertar los 6 signos de un grupo suma 10 puntos extra por grupo." />
-              <Rule title="Eliminatorias" text="Se predice el marcador tras 120 minutos y, si hay empate, el ganador por penaltis. El signo acertado suma 2 puntos." />
+              <Rule title="Eliminatorias" text="Se predice el marcador tras 120 minutos y, si hay empate, el ganador por penaltis. El signo acertado suma 2 puntos; el empate acertado sin exacto suma 1, el resultado exacto suma 3 y acertar los penaltis suma 1 extra." />
               <Rule title="Bonus finales" text="Campeon: 40 puntos. Maximo goleador: 25 puntos. MVP: 25 puntos." />
               <Rule title="Premios" text="Habra premio para el 1er, 2o y 3er clasificado final. El importe de cada premio esta pendiente de confirmar." />
             </div>
@@ -2588,34 +2615,30 @@ setMatchPredictions((current) => {
                 </table>
               </article>
               <article className="panel">
-                <h3>Resultados exactos en eliminatorias</h3>
+                <h3>Puntuacion base en eliminatorias</h3>
                 <table className="rules-table">
                   <thead>
                     <tr>
-                      <th>Ronda</th>
-                      <th>Puntos extra</th>
+                      <th>Acierto</th>
+                      <th>Puntos</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td>Ronda de 32</td>
-                      <td>4</td>
+                      <td>Signo 1-2 acertado</td>
+                      <td>2</td>
                     </tr>
                     <tr>
-                      <td>Octavos</td>
-                      <td>6</td>
+                      <td>Empate tras 120 minutos acertado sin resultado exacto</td>
+                      <td>1</td>
                     </tr>
                     <tr>
-                      <td>Cuartos</td>
-                      <td>6</td>
+                      <td>Resultado exacto tras 120 minutos</td>
+                      <td>3</td>
                     </tr>
                     <tr>
-                      <td>Semifinal</td>
-                      <td>8</td>
-                    </tr>
-                    <tr>
-                      <td>Final</td>
-                      <td>10</td>
+                      <td>Ganador por penaltis acertado si se predijo empate</td>
+                      <td>1 extra</td>
                     </tr>
                   </tbody>
                 </table>
@@ -3164,7 +3187,6 @@ function seedGroupPredictions(current: PredictionSlip[], players: Participant[])
           [
             ...predictedQualification.groupWinners.filter((item) => item.group === group).map((item) => item.team),
             ...predictedQualification.groupRunnersUp.filter((item) => item.group === group).map((item) => item.team),
-            ...predictedQualification.bestThirds.filter((item) => item.group === group).map((item) => item.team),
           ],
         ]),
       ),
@@ -3220,8 +3242,8 @@ function validatePublicForm(form: {
       errors.push(`Primero del grupo ${group}`)
     }
 
-    if ((form.groupQualified[group] ?? []).length !== 3) {
-      errors.push(`3 clasificados del grupo ${group}`)
+    if ((form.groupQualified[group] ?? []).length !== 2) {
+      errors.push(`2 clasificados del grupo ${group}`)
     }
   })
 
@@ -3288,6 +3310,7 @@ function generatePredictionPdf({
   matches: Match[]
 }) {
   const doc = new jsPDF()
+  const autoTableDoc = doc as AutoTableDocument
 
 
 doc.setFontSize(20)
@@ -3336,7 +3359,7 @@ doc.text('Predicciones finales', 14, 85)
   })
 
   autoTable(doc, {
-    startY: (doc as any).lastAutoTable.finalY + 12,
+    startY: (autoTableDoc.lastAutoTable?.finalY ?? 72) + 12,
     head: [['Grupo', 'Local', 'GL', 'GV', 'Visitante']],
     body: tableRows,
     styles: {
@@ -3344,7 +3367,7 @@ doc.text('Predicciones finales', 14, 85)
     },
   })
 
-  const finalY = (doc as any).lastAutoTable.finalY + 15
+  const finalY = (autoTableDoc.lastAutoTable?.finalY ?? 72) + 15
 
   doc.setFontSize(11)
   doc.text(

@@ -62,7 +62,7 @@ describe('scorePrediction', () => {
     assert.equal(pointsFor('Partidos de grupo', prediction, state), 4)
   })
 
-  it('adds knockout exact points and sign bonus for finished rounds', () => {
+  it('scores knockout draws, exact scores and penalties separately', () => {
     const state: TournamentState = {
       semifinalists: [],
       groupWinners: {},
@@ -89,8 +89,39 @@ describe('scorePrediction', () => {
       ],
     }
 
-    assert.equal(pointsFor('Eliminatorias', prediction, state), 12)
+    assert.equal(pointsFor('Eliminatorias', prediction, state), 4)
     assert.equal(pointsFor('Bonus eliminatorias', prediction, state), 5)
+  })
+
+  it('gives one knockout point for predicting penalties without the exact draw score', () => {
+    const state: TournamentState = {
+      semifinalists: [],
+      groupWinners: {},
+      groupQualified: {},
+      bestThirds: [],
+      matches: [
+        {
+          id: 'm104',
+          stage: 'Final',
+          home: 'Spain',
+          away: 'Argentina',
+          homeScore: 2,
+          awayScore: 2,
+          penaltyWinner: 'Spain',
+          status: 'finalizado',
+        },
+      ],
+    }
+
+    const prediction: PredictionSlip = {
+      ...basePrediction,
+      matches: [
+        { matchId: 'm104', homeScore: 1, awayScore: 1, penaltyWinner: 'Argentina' },
+      ],
+    }
+
+    assert.equal(pointsFor('Eliminatorias', prediction, state), 1)
+    assert.equal(pointsFor('Bonus eliminatorias', prediction, state), 0)
   })
 
   it('scores tournament bonuses from derived official outcomes', () => {
