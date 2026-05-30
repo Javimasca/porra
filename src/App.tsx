@@ -192,6 +192,7 @@ function App() {
     timestamp: Date
   } | null>(null)
   const [publicFormEditMode, setPublicFormEditMode] = useState(false)
+  const [reopenRequestSubmitting, setReopenRequestSubmitting] = useState(false)
   const [publicForm, setPublicForm] = useState({
     accessCode: '',
     name: '',
@@ -1179,19 +1180,30 @@ type="button"
                         {publicParticipantPrediction.locked && (
                           <button
                             className="secondary-action"
-                            disabled={publicParticipantPrediction.reopenRequested}
-                            onClick={() => {
+                            disabled={publicParticipantPrediction.reopenRequested || reopenRequestSubmitting}
+                            onClick={async () => {
+                              setReopenRequestSubmitting(true)
+                              const saved = await requestPredictionReopen(publicForm.accessCode)
+                              setReopenRequestSubmitting(false)
+
+                              if (!saved) {
+                                window.alert('No se pudo solicitar la reapertura. Prueba de nuevo.')
+                                return
+                              }
+
                               setPredictions((current) =>
                                 current.map((prediction) =>
                                   prediction.participantId === publicParticipant.id
-                                    ? { ...prediction, reopenRequested: true }
+                                    ? normalizePredictionSlip(saved.prediction)
                                     : prediction,
                                 ),
                               )
                             }}
                             type="button"
                           >
-                            {publicParticipantPrediction.reopenRequested ? 'Reapertura solicitada' : 'Solicitar reapertura'}
+                            {publicParticipantPrediction.reopenRequested || reopenRequestSubmitting
+                              ? 'Reapertura solicitada'
+                              : 'Solicitar reapertura'}
                           </button>
                         )}
                         <button
@@ -3537,6 +3549,26 @@ async function submitPublicPrediction(body: {
     return response.json()
   } catch (error) {
     console.error('No se pudo guardar la prediccion publica', error)
+    return null
+  }
+}
+
+async function requestPredictionReopen(accessCode: string): Promise<{ prediction: PredictionSlip } | null> {
+  try {
+    const response = await fetch('/api/predictions/reopen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessCode }),
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`HTTP ${response.status}: ${text}`)
+    }
+
+    return response.json()
+  } catch (error) {
+    console.error('No se pudo solicitar la reapertura', error)
     return null
   }
 }
