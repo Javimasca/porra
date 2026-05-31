@@ -147,6 +147,26 @@ function normalizePredictionSlip(prediction: Partial<PredictionSlip>): Predictio
   }
 }
 
+function clearTournamentResults(state: TournamentState): TournamentState {
+  return {
+    ...state,
+    champion: undefined,
+    semifinalists: [],
+    topScorer: undefined,
+    mvp: undefined,
+    groupWinners: {},
+    groupQualified: {},
+    bestThirds: [],
+    matches: state.matches.map((match) => ({
+      ...match,
+      homeScore: undefined,
+      awayScore: undefined,
+      penaltyWinner: undefined,
+      status: 'programado',
+    })),
+  }
+}
+
 function loadTournamentState() {
   if (typeof window === 'undefined') {
     return initialTournamentState
@@ -2435,7 +2455,7 @@ setMatchPredictions((current) => {
                 </button>
                 <button
                   className="secondary-action"
-                  onClick={() => setTournamentState(initialTournamentState)}
+                  onClick={() => setTournamentState((current) => clearTournamentResults(current))}
                   type="button"
                 >
                   Reiniciar resultados
@@ -2501,7 +2521,6 @@ setMatchPredictions((current) => {
                   </div>
                   <div className="leaderboard-detail">
                     <h3>{entry.participant.name}</h3>
-                    <p>{entry.participant.contact}</p>
                     <div className="score-breakdown">
                       {entry.breakdown.map((item) => (
                         <div className="score-pill" key={item.label}>
