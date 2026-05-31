@@ -616,10 +616,16 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
 
     if (!apiReady || !adminAuthenticated) return
 
-    const saved = await syncApi('/api/tournament', clearedState, adminPinInput)
+    const saved = await resetTournamentResults(adminPinInput)
     if (!saved) {
       window.alert('No se pudo guardar el reinicio de resultados. Revisa la conexion o el PIN admin.')
+      return
     }
+
+    setTournamentState({
+      ...clearedState,
+      matches: saved.matches.map(normalizeMatch),
+    })
   }
 
   return (
@@ -3631,6 +3637,28 @@ async function savePredictionPhase(predictionPhase: PredictionPhase, adminPin: s
     console.error('No se pudo guardar la fase de pronosticos', error)
     window.alert('No se pudo guardar la fase. Revisa el PIN admin.')
     return false
+  }
+}
+
+async function resetTournamentResults(adminPin: string): Promise<{ matches: Match[] } | null> {
+  try {
+    const response = await fetch('/api/tournament/reset-results', {
+      method: 'POST',
+      headers: {
+        ...(adminPin ? { 'x-admin-pin': adminPin } : {}),
+      },
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`HTTP ${response.status}: ${text}`)
+    }
+
+    const result = await response.json()
+    return Array.isArray(result.matches) ? { matches: result.matches } : null
+  } catch (error) {
+    console.error('No se pudo reiniciar resultados', error)
+    return null
   }
 }
 
