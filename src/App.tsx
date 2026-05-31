@@ -167,6 +167,16 @@ function clearTournamentResults(state: TournamentState): TournamentState {
   }
 }
 
+function normalizeMatch(match: Match): Match {
+  return {
+    ...match,
+    date: match.date ? String(match.date).slice(0, 10) : undefined,
+    homeScore: match.homeScore ?? undefined,
+    awayScore: match.awayScore ?? undefined,
+    penaltyWinner: match.penaltyWinner ?? undefined,
+  }
+}
+
 function loadTournamentState() {
   if (typeof window === 'undefined') {
     return initialTournamentState
@@ -280,10 +290,7 @@ if (!tournamentResponse.ok) {
         if (Array.isArray(apiTournament.matches)) {
           setTournamentState({
             ...initialTournamentState,
-            matches: apiTournament.matches.map((match: Match) => ({
-              ...match,
-              date: match.date ? String(match.date).slice(0, 10) : undefined,
-            })),
+            matches: apiTournament.matches.map(normalizeMatch),
           })
         }
 
@@ -602,6 +609,17 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     }))
     setPublicFormEditMode(false)
     setPublicFormStep('confirmation')
+  }
+  const resetOfficialResults = async () => {
+    const clearedState = clearTournamentResults(tournamentState)
+    setTournamentState(clearedState)
+
+    if (!apiReady || !adminAuthenticated) return
+
+    const saved = await syncApi('/api/tournament', clearedState, adminPinInput)
+    if (!saved) {
+      window.alert('No se pudo guardar el reinicio de resultados. Revisa la conexion o el PIN admin.')
+    }
   }
 
   return (
@@ -2455,7 +2473,7 @@ setMatchPredictions((current) => {
                 </button>
                 <button
                   className="secondary-action"
-                  onClick={() => setTournamentState((current) => clearTournamentResults(current))}
+                  onClick={resetOfficialResults}
                   type="button"
                 >
                   Reiniciar resultados
