@@ -425,7 +425,7 @@ if (!tournamentResponse.ok) {
   const pendingPlayers = participants.filter((player) => player.status === 'pendiente')
   const completedMatches = tournamentState.matches.filter((match) => match.status === 'finalizado')
   const lockedPredictions = predictions.filter((prediction) => prediction.locked)
-  const reopenRequests = predictions.filter((prediction) => prediction.reopenRequested)
+  const reopenRequests = predictions.filter((prediction) => prediction.reopenRequested && prediction.locked)
   const validatedParticipants = participants.filter((participant) => participant.status === 'validado')
   const qualification = useMemo(() => buildQualification(tournamentState.matches), [tournamentState.matches])
   const scoringTournamentState = useMemo(
@@ -1255,6 +1255,21 @@ type="button"
                         )}
                         {publicParticipantPrediction.locked && (
                           <button
+                            className="primary-action"
+                            onClick={() => {
+                              generatePredictionPdf({
+                                participant: publicParticipant,
+                                prediction: publicParticipantPrediction,
+                                matches: tournamentState.matches.filter((match) => match.stage === 'Grupo'),
+                              })
+                            }}
+                            type="button"
+                          >
+                            Descargar PDF
+                          </button>
+                        )}
+                        {publicParticipantPrediction.locked && (
+                          <button
                             className="secondary-action"
                             disabled={publicParticipantPrediction.reopenRequested || reopenRequestSubmitting}
                             onClick={async () => {
@@ -1699,9 +1714,8 @@ type="button"
                     <div className="row-actions">
                       <button
                         className="small-action"
-                        onClick={() => {
-                          setPredictions((current) =>
-                            current.map((item) =>
+                        onClick={async () => {
+                          const nextPredictions = predictions.map((item) =>
                               item.participantId === prediction.participantId
                                 ? {
                                     ...item,
@@ -1709,8 +1723,12 @@ type="button"
                                     reopenRequested: false,
                                   }
                                 : item,
-                            ),
                           )
+                          setPredictions(nextPredictions)
+                          const saved = await syncApi('/api/predictions', nextPredictions, adminPinInput)
+                          if (!saved) {
+                            window.alert('No se pudo guardar la reapertura. Revisa el PIN admin o la conexion.')
+                          }
                         }}
                         type="button"
                       >
@@ -1719,17 +1737,20 @@ type="button"
 
                       <button
                         className="secondary-action"
-                        onClick={() => {
-                          setPredictions((current) =>
-                            current.map((item) =>
+                        onClick={async () => {
+                          const nextPredictions = predictions.map((item) =>
                               item.participantId === prediction.participantId
                                 ? {
                                     ...item,
                                     reopenRequested: false,
                                   }
                                 : item,
-                            ),
                           )
+                          setPredictions(nextPredictions)
+                          const saved = await syncApi('/api/predictions', nextPredictions, adminPinInput)
+                          if (!saved) {
+                            window.alert('No se pudo guardar el cambio. Revisa el PIN admin o la conexion.')
+                          }
                         }}
                         type="button"
                       >
