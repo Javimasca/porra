@@ -1725,7 +1725,7 @@ type="button"
                                 : item,
                           )
                           setPredictions(nextPredictions)
-                          const saved = await syncApi('/api/predictions', nextPredictions, adminPinInput)
+                          const saved = await updateAdminReopenRequest(prediction.participantId, true, adminPinInput)
                           if (!saved) {
                             window.alert('No se pudo guardar la reapertura. Revisa el PIN admin o la conexion.')
                           }
@@ -1747,7 +1747,7 @@ type="button"
                                 : item,
                           )
                           setPredictions(nextPredictions)
-                          const saved = await syncApi('/api/predictions', nextPredictions, adminPinInput)
+                          const saved = await updateAdminReopenRequest(prediction.participantId, false, adminPinInput)
                           if (!saved) {
                             window.alert('No se pudo guardar el cambio. Revisa el PIN admin o la conexion.')
                           }
@@ -3689,6 +3689,29 @@ async function requestPredictionReopen(accessCode: string): Promise<{ prediction
     return response.json()
   } catch (error) {
     console.error('No se pudo solicitar la reapertura', error)
+    return null
+  }
+}
+
+async function updateAdminReopenRequest(participantId: string, reopen: boolean, adminPin: string) {
+  try {
+    const response = await fetch('/api/predictions/admin-reopen', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(adminPin ? { 'x-admin-pin': adminPin } : {}),
+      },
+      body: JSON.stringify({ participantId, reopen }),
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`HTTP ${response.status}: ${text}`)
+    }
+
+    return response.json()
+  } catch (error) {
+    console.error('No se pudo actualizar la solicitud de reapertura', error)
     return null
   }
 }
