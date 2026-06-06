@@ -583,11 +583,15 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     )
 
     if (locked) {
-      generatePredictionPdf({
-        participant: { ...publicParticipant, name: displayName },
-        prediction: nextPrediction,
-        matches: tournamentState.matches.filter((match) => match.stage === 'Grupo'),
-      })
+      try {
+        generatePredictionPdf({
+          participant: { ...publicParticipant, name: displayName },
+          prediction: nextPrediction,
+          matches: tournamentState.matches.filter((match) => match.stage === 'Grupo'),
+        })
+      } catch (error) {
+        console.error('No se pudo descargar el PDF automaticamente', error)
+      }
     }
 
     setPublicFormConfirmation({
@@ -818,6 +822,22 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
         <p className="form-description">
           Por seguridad, debes enviar el PDF descargado al administrador.
         </p>
+      )}
+
+      {publicParticipantPrediction?.locked && (
+        <button
+          className="primary-action"
+          onClick={() => {
+            generatePredictionPdf({
+              participant: publicParticipant,
+              prediction: publicParticipantPrediction,
+              matches: tournamentState.matches.filter((match) => match.stage === 'Grupo'),
+            })
+          }}
+          type="button"
+        >
+          Descargar PDF
+        </button>
       )}
 
       <p className="form-description">
