@@ -3385,18 +3385,37 @@ doc.text(`Fecha: ${new Date().toLocaleString()}`, 20, 65)
 
 doc.setFontSize(14)
 doc.text('Predicciones finales', 14, 85)
+  const groupRows = groups.map((group) => {
+    const first = prediction.groupWinners[group] || '-'
+    const second = (prediction.groupQualified[group] ?? []).find((team) => team !== first)
+
+    return [group, first, second || '-']
+  })
+  const groupFirsts = groupRows.map(([group, first]) => `${group}: ${first}`).join(' | ')
+  const groupSeconds = groupRows.map(([group, , second]) => `${group}: ${second}`).join(' | ')
   const summaryRows = [
     ['Campeon', prediction.champion || '-'],
     ['Maximo goleador', prediction.topScorer || '-'],
     ['MVP', prediction.mvp || '-'],
     ['Semifinalistas', prediction.semifinalists.join(', ') || '-'],
     ['Mejores terceros', prediction.bestThirds.join(', ') || '-'],
+    ['Primeros de grupo', groupFirsts || '-'],
+    ['Segundos de grupo', groupSeconds || '-'],
   ]
 
   autoTable(doc, {
     startY: 72,
     head: [['Concepto', 'Prediccion']],
     body: summaryRows,
+  })
+
+  autoTable(doc, {
+    startY: (autoTableDoc.lastAutoTable?.finalY ?? 72) + 12,
+    head: [['Grupo', 'Primero', 'Segundo']],
+    body: groupRows,
+    styles: {
+      fontSize: 8,
+    },
   })
 
   const tableRows = matches.map((match) => {
