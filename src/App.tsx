@@ -222,6 +222,8 @@ function App() {
     timestamp: Date
   } | null>(null)
   const [publicFormEditMode, setPublicFormEditMode] = useState(false)
+  const [publicSubmitError, setPublicSubmitError] = useState('')
+  const [publicSubmitSaving, setPublicSubmitSaving] = useState(false)
   const [reopenRequestSubmitting, setReopenRequestSubmitting] = useState(false)
   const [publicForm, setPublicForm] = useState({
     accessCode: '',
@@ -541,7 +543,10 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
   }
   const savePublicPrediction = async (locked: boolean) => {
     if (!publicParticipant) return
+    if (publicSubmitSaving) return
 
+    setPublicSubmitError('')
+    setPublicSubmitSaving(true)
     const participantId = publicParticipant.id
     const displayName = publicForm.alias.trim() || publicParticipant.name
     const matches = Object.values(publicForm.matches).filter(
@@ -562,7 +567,12 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
       matches,
     })
 
-    if (!saved) return
+    if (!saved.ok) {
+      setPublicSubmitSaving(false)
+      setPublicSubmitError(saved.error)
+      window.alert(saved.error)
+      return
+    }
 
     const nextPrediction = {
       ...normalizePredictionSlip(saved.prediction),
@@ -613,6 +623,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     }))
     setPublicFormEditMode(false)
     setPublicFormStep('confirmation')
+    setPublicSubmitSaving(false)
   }
   const resetOfficialResults = async () => {
     const clearedState = clearTournamentResults(tournamentState)
@@ -1146,9 +1157,10 @@ type="button"
                     </div>
 
                     <div className="form-actions">
+                      {publicSubmitError && <p className="form-error">{publicSubmitError}</p>}
                       <button
   className="secondary-action"
-  disabled={initialPredictionClosed}
+  disabled={initialPredictionClosed || publicSubmitSaving}
   onClick={() => savePublicPrediction(false)}
   type="button"
 >
@@ -1157,7 +1169,7 @@ type="button"
                       
                         <button
   className="primary-action"
-  disabled={publicFormErrors.length > 0 || initialPredictionClosed}
+  disabled={publicFormErrors.length > 0 || initialPredictionClosed || publicSubmitSaving}
   onClick={() => {
     const confirmed = window.confirm(
       'Vas a enviar tu porra como definitiva. Se descargará un PDF y ya no podrás editarla salvo reapertura del administrador. ¿Continuar?',
@@ -1171,7 +1183,7 @@ type="button"
                         }}
                         type="button"
                       >
-                        Enviar definitiva
+                        {publicSubmitSaving ? 'Enviando...' : 'Enviar definitiva'}
                       </button>
                       <button
                         className="secondary-action"
@@ -3615,7 +3627,7 @@ async function submitPublicPrediction(body: {
   groupQualified: Record<string, string[]>
   bestThirds: string[]
   matches: MatchPrediction[]
-}): Promise<{ prediction: PredictionSlip } | null> {
+}): Promise<{ ok: true; prediction: PredictionSlip } | { ok: false; error: string }> {
   try {
     const response = await fetch('/api/predictions/submit', {
       method: 'POST',
@@ -3625,13 +3637,18 @@ async function submitPublicPrediction(body: {
 
     if (!response.ok) {
       const text = await response.text()
-      throw new Error(`HTTP ${response.status}: ${text}`)
+      if (response.status === 409) {
+        return { ok: false, error: 'Esta porra ya esta bloqueada. Si necesitas modificarla, solicita reapertura.' }
+      }
+
+      return { ok: false, error: `No se pudo guardar la porra. HTTP ${response.status}: ${text}` }
     }
 
-    return response.json()
+    const result = await response.json()
+    return { ok: true, prediction: result.prediction }
   } catch (error) {
     console.error('No se pudo guardar la prediccion publica', error)
-    return null
+    return { ok: false, error: 'No se pudo conectar con el servidor para guardar la porra.' }
   }
 }
 
