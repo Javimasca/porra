@@ -118,7 +118,18 @@ export async function PUT(request: Request) {
     }
 
     await prisma.$transaction(async (tx) => {
+      const [existingParticipants, existingMatches] = await Promise.all([
+        tx.participant.findMany({ select: { id: true } }),
+        tx.match.findMany({ select: { id: true } }),
+      ])
+      const existingParticipantIds = new Set(existingParticipants.map((participant) => participant.id))
+      const existingMatchIds = new Set(existingMatches.map((match) => match.id))
+
       for (const prediction of predictions) {
+        if (!existingParticipantIds.has(prediction.participantId)) {
+          continue
+        }
+
         const existingPrediction = await tx.prediction.findUnique({
           where: { participantId: prediction.participantId },
           select: { locked: true, verificationCode: true },
@@ -171,15 +182,25 @@ export async function PUT(request: Request) {
         })
 
         await tx.matchPrediction.deleteMany({ where: { predictionId: saved.id } })
-        await tx.matchPrediction.createMany({
-          data: prediction.matches.map((match) => ({
-            predictionId: saved.id,
-            matchId: match.matchId,
-            homeScore: match.homeScore,
-            awayScore: match.awayScore,
-            penaltyWinner: match.penaltyWinner,
-          })),
-        })
+        const validMatches = Array.from(
+          new Map(
+            prediction.matches
+              .filter((match) => existingMatchIds.has(match.matchId))
+              .map((match) => [match.matchId, match]),
+          ).values(),
+        )
+
+        if (validMatches.length > 0) {
+          await tx.matchPrediction.createMany({
+            data: validMatches.map((match) => ({
+              predictionId: saved.id,
+              matchId: match.matchId,
+              homeScore: match.homeScore,
+              awayScore: match.awayScore,
+              penaltyWinner: match.penaltyWinner,
+            })),
+          })
+        }
       }
     })
 
@@ -194,4 +215,3 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
   }
 }
-

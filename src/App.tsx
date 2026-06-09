@@ -41,6 +41,14 @@ const allTeams = Array.from(
     .filter((match) => match.stage === 'Grupo')
     .flatMap((match) => [match.home, match.away])),
 ).sort((a, b) => a.localeCompare(b))
+
+function participantName(participants: Participant[], participantId: string) {
+  return participants.find((participant) => participant.id === participantId)?.name ?? ''
+}
+
+function sortParticipantsByName(participants: Participant[]) {
+  return [...participants].sort((a, b) => a.name.localeCompare(b.name))
+}
 const flags: Record<string, string> = {
   Algeria: '🇩🇿',
   Argentina: '🇦🇷',
@@ -167,6 +175,21 @@ function clearTournamentResults(state: TournamentState): TournamentState {
   }
 }
 
+function applyResolvedRoundOf32(state: TournamentState, qualification: ReturnType<typeof buildQualification>): TournamentState {
+  return {
+    ...state,
+    matches: state.matches.map((match) =>
+      match.stage === 'Ronda de 32'
+        ? {
+            ...match,
+            home: resolveKnockoutSlot(match.home, qualification) ?? match.home,
+            away: resolveKnockoutSlot(match.away, qualification) ?? match.away,
+          }
+        : match,
+    ),
+  }
+}
+
 function normalizeMatch(match: Match): Match {
   return {
     ...match,
@@ -216,6 +239,7 @@ function App() {
   const [activeKnockoutStage, setActiveKnockoutStage] = useState<(typeof knockoutStages)[number]>('Ronda de 32')
   const [matchPredictions, setMatchPredictions] = useState<Record<string, MatchPrediction>>({})
   const [knockoutPredictions, setKnockoutPredictions] = useState<Record<string, MatchPrediction>>({})
+  const [publicKnockoutPredictions, setPublicKnockoutPredictions] = useState<Record<string, MatchPrediction>>({})
   const [publicFormStep, setPublicFormStep] = useState<'code-input' | 'form' | 'confirmation'>('code-input')
   const [publicFormConfirmation, setPublicFormConfirmation] = useState<{
     participantName: string
@@ -428,9 +452,13 @@ if (!tournamentResponse.ok) {
   const reopenRequests = predictions.filter((prediction) => prediction.reopenRequested && prediction.locked)
   const validatedParticipants = participants.filter((participant) => participant.status === 'validado')
   const qualification = useMemo(() => buildQualification(tournamentState.matches), [tournamentState.matches])
+  const resolvedTournamentState = useMemo(
+    () => applyResolvedRoundOf32(tournamentState, qualification),
+    [qualification, tournamentState],
+  )
   const scoringTournamentState = useMemo(
     () => ({
-      ...tournamentState,
+      ...resolvedTournamentState,
       groupWinners: Object.fromEntries(
         qualification.groupWinners.map((item) => [item.group, item.team]),
       ),
@@ -445,7 +473,7 @@ if (!tournamentResponse.ok) {
       ),
       bestThirds: qualification.bestThirds.map((item) => item.team),
     }),
-    [qualification, tournamentState],
+    [qualification, resolvedTournamentState],
   )
   const leaderboard = useMemo(
     () => buildLeaderboard(participants, predictions, scoringTournamentState),
@@ -454,11 +482,14 @@ if (!tournamentResponse.ok) {
   const visibleTabs = mode === 'publico' ? publicTabs : adminTabs
   const closedPredictionStages = getClosedPredictionStages(predictionPhase)
   const publicVisiblePredictions = publicPredictions.filter((prediction) => prediction.locked)
+  const publicVisiblePredictionsByName = [...publicVisiblePredictions].sort((a, b) =>
+    participantName(participants, a.participantId).localeCompare(participantName(participants, b.participantId)),
+  )
   const filteredPublicPredictions = selectedPublicPredictionParticipantId
-    ? publicVisiblePredictions.filter(
+    ? publicVisiblePredictionsByName.filter(
         (prediction) => prediction.participantId === selectedPublicPredictionParticipantId,
       )
-    : publicVisiblePredictions
+    : publicVisiblePredictionsByName
   const visibleGroups = selectedPublicPredictionScope.startsWith('group-')
     ? [selectedPublicPredictionScope.replace('group-', '')]
     : groups
@@ -496,6 +527,39 @@ const currentKnockoutStage =
     : null
 
 const knockoutEditingEnabled = currentKnockoutStage !== null
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (!publicParticipantPrediction || !currentKnockoutStage) {
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setPublicKnockoutPredictions({})
+        }
+      })
+      return
+    }
+
+    const nextPredictions = Object.fromEntries(
+      publicParticipantPrediction.matches
+        .filter((prediction) => {
+          const match = tournamentState.matches.find((item) => item.id === prediction.matchId)
+          return match?.stage === currentKnockoutStage
+        })
+        .map((prediction) => [prediction.matchId, prediction]),
+    )
+
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setPublicKnockoutPredictions(nextPredictions)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentKnockoutStage, publicParticipantPrediction, tournamentState.matches])
+
   const enteredAccessCode = publicForm.accessCode.trim()
   const publicCodeHasInput = enteredAccessCode.length > 0
   const publicFormRequiredCount = publicFormErrors.length
@@ -540,6 +604,26 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
           : [...current, result.prediction],
       )
     }
+  }
+  const savePublicKnockoutPredictions = async () => {
+    const filledPredictions = Object.values(publicKnockoutPredictions).filter(
+      (prediction) => Number.isFinite(prediction.homeScore) && Number.isFinite(prediction.awayScore),
+    )
+    const saved = await submitPublicKnockoutPredictions(publicForm.accessCode, filledPredictions)
+
+    if (!saved?.prediction) {
+      window.alert('No se pudo guardar la ronda. Revisa la conexion.')
+      return
+    }
+
+    setPredictions((current) =>
+      current.map((prediction) =>
+        prediction.participantId === saved.prediction.participantId
+          ? normalizePredictionSlip(saved.prediction)
+          : prediction,
+      ),
+    )
+    window.alert('Ronda guardada.')
   }
   const savePublicPrediction = async (locked: boolean) => {
     if (!publicParticipant) return
@@ -1324,6 +1408,57 @@ type="button"
                       </div>
                     </div>
 
+                    {currentKnockoutStage && publicParticipantPrediction.locked && (
+                      <div className="meta-card">
+                        <h3>{currentKnockoutStage === 'Ronda de 32' ? 'Dieciseisavos' : currentKnockoutStage}</h3>
+                        <div className="knockout-prediction-list">
+                          {resolvedTournamentState.matches
+                            .filter((match) => match.stage === currentKnockoutStage)
+                            .map((match) => (
+                              <KnockoutPredictionRow
+                                key={match.id}
+                                match={match}
+                                onChange={(matchId, side, value) => {
+                                  const parsedValue = value === '' ? Number.NaN : Number(value)
+                                  setPublicKnockoutPredictions((current) => {
+                                    const previous = current[matchId] ?? {
+                                      matchId,
+                                      homeScore: Number.NaN,
+                                      awayScore: Number.NaN,
+                                    }
+
+                                    return {
+                                      ...current,
+                                      [matchId]: {
+                                        ...previous,
+                                        [side]: parsedValue,
+                                      },
+                                    }
+                                  })
+                                }}
+                                onPenaltyWinnerChange={(matchId, penaltyWinner) => {
+                                  setPublicKnockoutPredictions((current) => ({
+                                    ...current,
+                                    [matchId]: {
+                                      ...(current[matchId] ?? {
+                                        matchId,
+                                        homeScore: Number.NaN,
+                                        awayScore: Number.NaN,
+                                      }),
+                                      penaltyWinner,
+                                    },
+                                  }))
+                                }}
+                                prediction={publicKnockoutPredictions[match.id]}
+                              />
+                            ))}
+                        </div>
+                        <button className="primary-action" onClick={savePublicKnockoutPredictions} type="button">
+                          Guardar ronda
+                        </button>
+                      </div>
+                    )}
+
                     <div className="meta-card">
                       <h3>Detalle de tu predicción</h3>
                       <div className="meta-grid review-summary-grid">
@@ -1427,7 +1562,7 @@ type="button"
                       value={selectedPublicPredictionParticipantId}
                     >
                       <option value="">Todos</option>
-                      {publicVisiblePredictions.map((prediction) => {
+                      {publicVisiblePredictionsByName.map((prediction) => {
                         const participant = participants.find((item) => item.id === prediction.participantId)
                         return (
                           <option key={prediction.participantId} value={prediction.participantId}>
@@ -1468,7 +1603,7 @@ type="button"
                 {filteredPublicPredictions.map((prediction) => {
                     const participant = participants.find((item) => item.id === prediction.participantId)
                     const visibleMatches = prediction.matches.filter((pick) => {
-                      const match = tournamentState.matches.find((item) => item.id === pick.matchId)
+                      const match = resolvedTournamentState.matches.find((item) => item.id === pick.matchId)
                       return match ? closedPredictionStages.includes(match.stage) : false
                     })
                     const visiblePredictions = Object.fromEntries(
@@ -1564,7 +1699,7 @@ type="button"
                               <PredictionGroup
                                 disabled
                                 group={stage}
-                                matches={tournamentState.matches.filter((match) => match.stage === stage)}
+                                matches={resolvedTournamentState.matches.filter((match) => match.stage === stage)}
                                 onChange={() => undefined}
                                 pointsByMatch={scoringDetailsByParticipant[prediction.participantId]?.matches}
                                 predictions={visiblePredictions}
@@ -1619,6 +1754,20 @@ type="button"
                     ))}
                   </select>
                 </label>
+                <button
+                  className="secondary-action"
+                  onClick={async () => {
+                    const nextState = applyResolvedRoundOf32(tournamentState, qualification)
+                    setTournamentState(nextState)
+                    const saved = await syncApi('/api/tournament', nextState, adminPinInput)
+                    if (!saved) {
+                      window.alert('No se pudieron guardar los cruces de ronda de 32.')
+                    }
+                  }}
+                  type="button"
+                >
+                  Aplicar cruces R32
+                </button>
                 <button className="primary-action" type="button">Recalcular puntos</button>
               </div>
             </header>
@@ -2066,6 +2215,7 @@ type="button"
                 }}
                 participant={participants.find((participant) => participant.id === reviewParticipantId)}
                 prediction={predictions.find((prediction) => prediction.participantId === reviewParticipantId)}
+                tournamentState={tournamentState}
               />
             )}
           </section>
@@ -2147,6 +2297,23 @@ type="button"
                 >
                   {selectedPrediction?.locked ? 'Reabrir edicion' : 'Marcar definitiva'}
                 </button>
+                <button
+                  className="secondary-action"
+                  disabled={!selectedPrediction || !selectedPredictionParticipantId}
+                  onClick={() => {
+                    const participant = participants.find((item) => item.id === selectedPredictionParticipantId)
+                    if (!participant || !selectedPrediction) return
+
+                    generatePredictionPdf({
+                      participant,
+                      prediction: selectedPrediction,
+                      matches: tournamentState.matches.filter((match) => match.stage === 'Grupo'),
+                    })
+                  }}
+                  type="button"
+                >
+                  Descargar PDF
+                </button>
 <button
   className="secondary-action"
   disabled={!selectedPredictionParticipantId || !selectedPrediction?.locked}
@@ -2176,7 +2343,7 @@ type="button"
                   value={selectedPredictionParticipantId}
                 >
                   <option value="">Seleccionar</option>
-                  {validatedParticipants.map((participant) => (
+                  {sortParticipantsByName(validatedParticipants).map((participant) => (
                     <option key={participant.id} value={participant.id}>{participant.name}</option>
                   ))}
                 </select>
@@ -2387,7 +2554,7 @@ setMatchPredictions((current) => {
                       (prediction) => prediction.participantId === selectedKnockoutParticipantId,
                     )
                     const groupPredictions = existing?.matches.filter((prediction) => {
-                      const match = tournamentState.matches.find((item) => item.id === prediction.matchId)
+    const match = resolvedTournamentState.matches.find((item) => item.id === prediction.matchId)
                       return match?.stage === 'Grupo'
                     }) ?? []
                     const editableStagePredictions = filledKnockoutPredictions.filter((prediction) => {
@@ -2455,7 +2622,7 @@ setMatchPredictions((current) => {
               <div className="prediction-summary">
                 <strong>
                   {
-                    tournamentState.matches.filter((match) => match.stage === activeKnockoutStage).length
+                    resolvedTournamentState.matches.filter((match) => match.stage === activeKnockoutStage).length
                   }
                 </strong>
                 <span>partidos de la ronda</span>
@@ -2463,7 +2630,7 @@ setMatchPredictions((current) => {
             </div>
 
             <div className="knockout-prediction-list">
-              {tournamentState.matches
+              {resolvedTournamentState.matches
                 .filter(
   (match) =>
     match.stage ===
@@ -2946,11 +3113,13 @@ function PredictionReview({
   onToggleLocked,
   participant,
   prediction,
+  tournamentState,
 }: {
   onClose: () => void
   onToggleLocked: (locked: boolean) => void
   participant?: Participant
   prediction?: PredictionSlip
+  tournamentState: TournamentState
 }) {
   if (!participant) {
     return null
@@ -2968,6 +3137,21 @@ function PredictionReview({
           <span>{participant.contact}</span>
         </div>
         <div className="row-actions">
+          {prediction && (
+  <button
+    className="small-action"
+    onClick={() =>
+      generatePredictionPdf({
+        participant,
+        prediction,
+        matches: tournamentState.matches.filter((match) => match.stage === 'Grupo'),
+      })
+    }
+    type="button"
+  >
+    Descargar PDF
+  </button>
+)}
           {prediction && (
   <button
     className="small-action"
@@ -3670,6 +3854,29 @@ async function submitPublicPrediction(body: {
   } catch (error) {
     console.error('No se pudo guardar la prediccion publica', error)
     return { ok: false, error: 'No se pudo conectar con el servidor para guardar la porra.' }
+  }
+}
+
+async function submitPublicKnockoutPredictions(
+  accessCode: string,
+  matches: MatchPrediction[],
+): Promise<{ prediction: PredictionSlip | null } | null> {
+  try {
+    const response = await fetch('/api/predictions/knockout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessCode, matches }),
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`HTTP ${response.status}: ${text}`)
+    }
+
+    return response.json()
+  } catch (error) {
+    console.error('No se pudieron guardar las eliminatorias publicas', error)
+    return null
   }
 }
 
