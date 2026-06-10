@@ -136,11 +136,10 @@ export async function PUT(request: Request) {
         })
 
         if (existingPrediction?.locked) {
-          if (prediction.locked === false || prediction.reopenRequested !== undefined) {
+          if (prediction.reopenRequested !== undefined) {
             await tx.prediction.update({
               where: { participantId: prediction.participantId },
               data: {
-                locked: prediction.locked,
                 reopenRequested: prediction.reopenRequested ?? false,
               },
             })

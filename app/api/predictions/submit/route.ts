@@ -147,15 +147,27 @@ export async function POST(request: Request) {
         where: { predictionId: prediction.id },
       })
 
-      await tx.matchPrediction.createMany({
-        data: payload.matches.map((match) => ({
-          predictionId: prediction.id,
-          matchId: match.matchId,
-          homeScore: match.homeScore,
-          awayScore: match.awayScore,
-          penaltyWinner: match.penaltyWinner,
-        })),
-      })
+      const existingMatches = await tx.match.findMany({ select: { id: true } })
+      const existingMatchIds = new Set(existingMatches.map((match) => match.id))
+      const validMatches = Array.from(
+        new Map(
+          payload.matches
+            .filter((match) => existingMatchIds.has(match.matchId))
+            .map((match) => [match.matchId, match]),
+        ).values(),
+      )
+
+      if (validMatches.length > 0) {
+        await tx.matchPrediction.createMany({
+          data: validMatches.map((match) => ({
+            predictionId: prediction.id,
+            matchId: match.matchId,
+            homeScore: match.homeScore,
+            awayScore: match.awayScore,
+            penaltyWinner: match.penaltyWinner,
+          })),
+        })
+      }
 
       return tx.prediction.findUnique({
         where: { participantId: participant.id },
@@ -194,4 +206,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
   }
 }
-

@@ -2284,7 +2284,16 @@ type="button"
                 <button
                   className="secondary-action"
                   disabled={!selectedPredictionParticipantId}
-                  onClick={() => {
+                  onClick={async () => {
+                    const reopen = Boolean(selectedPrediction?.locked)
+                    if (reopen) {
+                      const saved = await updateAdminReopenRequest(selectedPredictionParticipantId, true, adminPinInput)
+                      if (!saved) {
+                        window.alert('No se pudo reabrir la prediccion.')
+                        return
+                      }
+                    }
+
                     setPredictions((current) =>
                       current.map((prediction) =>
                         prediction.participantId === selectedPredictionParticipantId
