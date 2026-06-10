@@ -663,6 +663,9 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
       submittedAt: locked ? new Date().toISOString() : undefined,
       pdfReceived: false,
     }
+    const confirmedPrediction = locked
+      ? (await fetchMyPrediction(publicForm.accessCode))?.prediction ?? nextPrediction
+      : nextPrediction
 
     setParticipants((current) =>
       current.map((participant) =>
@@ -672,15 +675,15 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
 
     setPredictions((current) =>
       current.some((prediction) => prediction.participantId === participantId)
-        ? current.map((prediction) => (prediction.participantId === participantId ? nextPrediction : prediction))
-        : [...current, nextPrediction],
+        ? current.map((prediction) => (prediction.participantId === participantId ? confirmedPrediction : prediction))
+        : [...current, confirmedPrediction],
     )
 
     if (locked) {
       try {
         generatePredictionPdf({
           participant: { ...publicParticipant, name: displayName },
-          prediction: nextPrediction,
+          prediction: confirmedPrediction,
           matches: tournamentState.matches.filter((match) => match.stage === 'Grupo'),
         })
       } catch (error) {

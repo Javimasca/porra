@@ -154,7 +154,7 @@ export async function PUT(request: Request) {
         const saved = await tx.prediction.upsert({
           where: { participantId: prediction.participantId },
           update: {
-            locked: prediction.locked,
+            locked: prediction.locked ? true : existingPrediction?.locked ?? false,
             reopenRequested: prediction.reopenRequested ?? false,
             champion: prediction.champion,
             semifinalists: prediction.semifinalists,
