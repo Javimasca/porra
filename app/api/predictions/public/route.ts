@@ -27,13 +27,23 @@ export async function GET() {
     }
 
     const predictions = await prisma.prediction.findMany({
-      where: { locked: true },
-      include: { matches: { include: { match: true } } },
+      where: { locked: true, participant: { status: 'validado' } },
+      include: {
+        participant: true,
+        matches: { include: { match: true } },
+      },
       orderBy: { createdAt: 'asc' },
     })
 
     return NextResponse.json(
       predictions.map((prediction) => ({
+        participant: {
+          id: prediction.participant.id,
+          name: prediction.participant.name,
+          contact: prediction.participant.contact,
+          accessCode: prediction.participant.accessCode,
+          status: prediction.participant.status,
+        },
         participantId: prediction.participantId,
         verificationCode: prediction.verificationCode ?? '',
         locked: prediction.locked,
@@ -60,4 +70,3 @@ export async function GET() {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
   }
 }
-

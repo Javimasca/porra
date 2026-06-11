@@ -311,6 +311,21 @@ if (!tournamentResponse.ok) {
 
         if (Array.isArray(apiPredictions)) {
           setPublicPredictions(apiPredictions.map(normalizePredictionSlip))
+          const publicParticipants = (apiPredictions as Array<{ participant?: Participant }>)
+            .map((prediction) => prediction.participant)
+            .filter(Boolean)
+            .map(normalizeParticipantAccessCode)
+
+          if (publicParticipants.length > 0) {
+            setParticipants((current) => {
+              const nextParticipants = new Map(current.map((participant) => [participant.id, participant]))
+              publicParticipants.forEach((participant) => {
+                nextParticipants.set(participant.id, participant)
+              })
+
+              return Array.from(nextParticipants.values())
+            })
+          }
         }
 
         if (Array.isArray(apiTournament.matches)) {
@@ -481,10 +496,7 @@ if (!tournamentResponse.ok) {
   )
   const visibleTabs = mode === 'publico' ? publicTabs : adminTabs
   const closedPredictionStages = getClosedPredictionStages(predictionPhase)
-  const validatedParticipantIds = new Set(validatedParticipants.map((participant) => participant.id))
-  const publicVisiblePredictions = publicPredictions.filter(
-    (prediction) => prediction.locked && validatedParticipantIds.has(prediction.participantId),
-  )
+  const publicVisiblePredictions = publicPredictions.filter((prediction) => prediction.locked)
   const publicVisiblePredictionsByName = [...publicVisiblePredictions].sort((a, b) =>
     participantName(participants, a.participantId).localeCompare(participantName(participants, b.participantId)),
   )
