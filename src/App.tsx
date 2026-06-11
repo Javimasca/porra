@@ -761,14 +761,14 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
       return
     }
 
-    const saved = await syncApi('/api/tournament', tournamentState, adminPinInput)
-    if (!saved) {
-      window.alert('No se pudieron guardar los resultados. Revisa la conexion o el PIN admin.')
+    const saved = await saveTournamentState(tournamentState, adminPinInput)
+    if (!saved.ok) {
+      window.alert(`No se pudieron guardar los resultados. ${saved.error}`)
       return
     }
 
-    const savedMatches = Array.isArray(saved.matches)
-      ? saved.matches
+    const savedMatches = Array.isArray(saved.data?.matches)
+      ? saved.data.matches
       : await loadTournamentMatches()
 
     if (!savedMatches) {
@@ -3831,6 +3831,43 @@ async function syncApi(path: string, body: unknown, adminPin?: string) {
   } catch (error) {
     console.error(`No se pudo sincronizar ${path}`, error)
     return null
+  }
+}
+
+async function saveTournamentState(state: TournamentState, adminPin?: string): Promise<{
+  ok: true
+  data: { matches?: Match[] }
+} | {
+  ok: false
+  error: string
+}> {
+  try {
+    const response = await fetch('/api/tournament', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(adminPin ? { 'x-admin-pin': adminPin } : {}),
+      },
+      body: JSON.stringify(state),
+    })
+    const text = await response.text()
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: `HTTP ${response.status}: ${text || response.statusText}`,
+      }
+    }
+
+    return {
+      ok: true,
+      data: text ? JSON.parse(text) : {},
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Error de red desconocido',
+    }
   }
 }
 
