@@ -5,6 +5,17 @@ import { getPrisma } from '../../../src/lib/prisma'
 const stages = new Set(['Grupo', 'Ronda de 32', 'Octavos', 'Cuartos', 'Semifinal', 'Final'])
 const statuses = new Set(['programado', 'en_juego', 'finalizado'])
 
+function dateFromMatch(value?: string) {
+  if (!value) return null
+
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'Unknown database error'
+}
+
 function isMatch(value: unknown): value is {
   id: string
   group?: string
@@ -73,7 +84,7 @@ export async function PUT(request: Request) {
           update: {
             group: match.group,
             stage: match.stage,
-            date: match.date ? new Date(match.date) : null,
+            date: dateFromMatch(match.date),
             venue: match.venue,
             home: match.home,
             away: match.away,
@@ -86,7 +97,7 @@ export async function PUT(request: Request) {
             id: match.id,
             group: match.group,
             stage: match.stage,
-            date: match.date ? new Date(match.date) : null,
+            date: dateFromMatch(match.date),
             venue: match.venue,
             home: match.home,
             away: match.away,
@@ -104,7 +115,14 @@ export async function PUT(request: Request) {
     })
 
     return NextResponse.json({ ok: true, matches })
-  } catch {
-    return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
+  } catch (error) {
+    console.error('PUT /api/tournament error:', error)
+    return NextResponse.json(
+      {
+        error: 'Database unavailable',
+        detail: errorMessage(error),
+      },
+      { status: 503 },
+    )
   }
 }
