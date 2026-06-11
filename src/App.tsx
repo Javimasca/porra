@@ -36,6 +36,7 @@ const tournamentStorageKey = 'porra-2026-tournament'
 const defaultPredictionPhase: PredictionPhase = 'preGroups'
 const groups = 'ABCDEFGHIJKL'.split('')
 const knockoutStages = ['Ronda de 32', 'Octavos', 'Cuartos', 'Semifinal', 'Final'] as const
+const liveScoreStatuses = new Set(['en_juego', 'finalizado'])
 const allTeams = Array.from(
   new Set(initialTournamentState.matches
     .filter((match) => match.stage === 'Grupo')
@@ -347,7 +348,16 @@ if (!tournamentResponse.ok) {
     }
 
     loadFromApi()
-  }, [])
+    if (adminAuthenticated) return
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        loadFromApi()
+      }
+    }, 30000)
+
+    return () => window.clearInterval(interval)
+  }, [adminAuthenticated])
 
   useEffect(() => {
     const accessCode = publicForm.accessCode.trim()
@@ -463,6 +473,7 @@ if (!tournamentResponse.ok) {
   const paidPlayers = participants.filter((player) => player.status === 'validado')
   const pendingPlayers = participants.filter((player) => player.status === 'pendiente')
   const completedMatches = tournamentState.matches.filter((match) => match.status === 'finalizado')
+  const hasLiveMatches = tournamentState.matches.some((match) => match.status === 'en_juego')
   const lockedPredictions = predictions.filter((prediction) => prediction.locked)
   const reopenRequests = predictions.filter((prediction) => prediction.reopenRequested && prediction.locked)
   const validatedParticipants = participants.filter((participant) => participant.status === 'validado')
@@ -523,6 +534,7 @@ if (!tournamentResponse.ok) {
     () => buildLeaderboard(participants, leaderboardPredictions, scoringTournamentState),
     [participants, leaderboardPredictions, scoringTournamentState],
   )
+  const liveScoreNotice = hasLiveMatches ? <span className="live-score-notice">Incluye partidos en juego</span> : null
   const selectedPrediction = predictions.find(
     (prediction) => prediction.participantId === selectedPredictionParticipantId,
   )
@@ -1808,7 +1820,7 @@ type="button"
               <div className="panel wide">
                 <div className="panel-title">
                   <h3>Clasificacion</h3>
-                  <span>desglose auditable</span>
+                  {liveScoreNotice ?? <span>desglose auditable</span>}
                 </div>
                 <div className="ranking-list">
                   {leaderboard.map((entry, index) => (
@@ -2766,9 +2778,17 @@ setMatchPredictions((current) => {
 
                               return {
                                 ...nextMatch,
-                                status: hasResult ? 'finalizado' : 'programado',
+                                status: hasResult ? nextMatch.status : 'programado',
                               }
                             }),
+                          }))
+                        }}
+                        onStatusChange={(matchId, status) => {
+                          setTournamentState((current) => ({
+                            ...current,
+                            matches: current.matches.map((item) => (
+                              item.id === matchId ? { ...item, status } : item
+                            )),
                           }))
                         }}
                       />
@@ -2786,7 +2806,10 @@ setMatchPredictions((current) => {
                 <p className="eyebrow">Ranking</p>
                 <h2>Clasificacion de participantes</h2>
               </div>
-              <span className="fixture-count">{leaderboard.length} participantes</span>
+              <div className="header-actions">
+                {liveScoreNotice}
+                <span className="fixture-count">{leaderboard.length} participantes</span>
+              </div>
             </header>
 
             <div className="leaderboard-page">
@@ -3038,14 +3061,15 @@ function KnockoutCard({
       </div>
       <div className="knockout-team">
         <span>{teamLabel(resolvedHome ?? match.home)}</span>
-        <b>{match.homeScore ?? '-'}</b>
+        <b className={match.status === 'en_juego' ? 'live-score' : undefined}>{match.homeScore ?? '-'}</b>
       </div>
       {resolvedHome && <small className="resolved-slot">{match.home}</small>}
       <div className="knockout-team">
         <span>{teamLabel(resolvedAway ?? match.away)}</span>
-        <b>{match.awayScore ?? '-'}</b>
+        <b className={match.status === 'en_juego' ? 'live-score' : undefined}>{match.awayScore ?? '-'}</b>
       </div>
       {resolvedAway && <small className="resolved-slot">{match.away}</small>}
+      {match.status === 'en_juego' && <small className="live-match-badge">En juego</small>}
     </article>
   )
 }
@@ -3112,9 +3136,11 @@ function KnockoutPredictionRow({
 function OfficialResultRow({
   match,
   onChange,
+  onStatusChange,
 }: {
   match: Match
   onChange: (matchId: string, side: 'homeScore' | 'awayScore', value: string) => void
+  onStatusChange: (matchId: string, status: Match['status']) => void
 }) {
   return (
     <div className="official-result-row">
@@ -3136,7 +3162,15 @@ function OfficialResultRow({
         value={match.awayScore ?? ''}
       />
       <span>{teamLabel(match.away)}</span>
-      <small>{match.status === 'finalizado' ? 'Finalizado' : 'Pendiente'}</small>
+      <select
+        aria-label={`Estado ${match.home} contra ${match.away}`}
+        onChange={(event) => onStatusChange(match.id, event.target.value as Match['status'])}
+        value={match.status}
+      >
+        <option value="programado">Pendiente</option>
+        <option value="en_juego">En juego</option>
+        <option value="finalizado">Finalizado</option>
+      </select>
     </div>
   )
 }
@@ -3287,11 +3321,16 @@ function GroupCard({
               <time>{formatDate(match.date)}</time>
               <div className="fixture-teams">
                 <span>{teamLabel(match.home)}</span>
-                <b>{match.homeScore === undefined ? '-' : match.homeScore}</b>
+                <b className={match.status === 'en_juego' ? 'live-score' : undefined}>
+                  {match.homeScore === undefined ? '-' : match.homeScore}
+                </b>
                 <small>vs</small>
-                <b>{match.awayScore === undefined ? '-' : match.awayScore}</b>
+                <b className={match.status === 'en_juego' ? 'live-score' : undefined}>
+                  {match.awayScore === undefined ? '-' : match.awayScore}
+                </b>
                 <span>{teamLabel(match.away)}</span>
               </div>
+              {match.status === 'en_juego' && <small className="live-match-badge">En juego</small>}
             </div>
           ))}
         </div>
@@ -3341,7 +3380,7 @@ function buildGroupStandings(matches: Match[]) {
     ensureStanding(standings, match.home)
     ensureStanding(standings, match.away)
 
-    if (match.status !== 'finalizado' || match.homeScore === undefined || match.awayScore === undefined) {
+    if (!liveScoreStatuses.has(match.status) || match.homeScore === undefined || match.awayScore === undefined) {
       return
     }
 

@@ -1,5 +1,5 @@
 export type ParticipantStatus = 'pendiente' | 'validado' | 'retirado'
-export type MatchStatus = 'programado' | 'finalizado'
+export type MatchStatus = 'programado' | 'en_juego' | 'finalizado'
 export type Stage = 'Grupo' | 'Ronda de 32' | 'Octavos' | 'Cuartos' | 'Semifinal' | 'Final'
 
 export type Participant = {

@@ -3,7 +3,7 @@ import { requireAdmin } from '../../../src/lib/apiSecurity'
 import { getPrisma } from '../../../src/lib/prisma'
 
 const stages = new Set(['Grupo', 'Ronda de 32', 'Octavos', 'Cuartos', 'Semifinal', 'Final'])
-const statuses = new Set(['programado', 'finalizado'])
+const statuses = new Set(['programado', 'en_juego', 'finalizado'])
 
 function isMatch(value: unknown): value is {
   id: string

@@ -201,4 +201,32 @@ describe('scorePrediction', () => {
     assert.equal(details.matches['g-a-1'], 3)
     assert.deepEqual(details.bonuses, [{ label: 'Campeon', points: 40 }])
   })
+
+  it('scores matches in play as provisional points', () => {
+    const state: TournamentState = {
+      semifinalists: [],
+      groupWinners: {},
+      groupQualified: {},
+      bestThirds: [],
+      matches: [
+        {
+          id: 'g-a-1',
+          group: 'A',
+          stage: 'Grupo',
+          home: 'Spain',
+          away: 'Japan',
+          homeScore: 1,
+          awayScore: 0,
+          status: 'en_juego',
+        },
+      ],
+    }
+    const prediction: PredictionSlip = {
+      ...basePrediction,
+      matches: [{ matchId: 'g-a-1', homeScore: 1, awayScore: 0 }],
+    }
+
+    assert.equal(pointsFor('Partidos de grupo', prediction, state), 3)
+    assert.equal(scorePredictionDetails(prediction, state).matches['g-a-1'], 3)
+  })
 })

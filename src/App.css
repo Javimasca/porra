@@ -788,6 +788,15 @@ tbody tr:last-child td {
   font-weight: 900;
 }
 
+.live-score-notice {
+  padding: 10px 14px;
+  border: 1px solid #f2c94c;
+  border-radius: 8px;
+  color: #6d4a00;
+  background: #fff7d6;
+  font-weight: 900;
+}
+
 .worldcup-board {
   display: grid;
   gap: 18px;
@@ -942,13 +951,15 @@ tbody tr:last-child td {
 }
 
 .official-result-row time,
-.official-result-row small {
+.official-result-row small,
+.official-result-row select {
   color: #65717c;
   font-weight: 800;
   font-size: 0.82rem;
 }
 
-.official-result-row input {
+.official-result-row input,
+.official-result-row select {
   min-height: 34px;
   padding: 0 6px;
   text-align: center;
@@ -1016,6 +1027,7 @@ tbody tr:last-child td {
 }
 
 .fixture-row {
+  grid-template-columns: 76px minmax(0, 1fr) auto;
   min-height: 38px;
   border-bottom: 1px solid #e8edf1;
   font-size: 0.9rem;
@@ -1042,6 +1054,33 @@ tbody tr:last-child td {
 .fixture-teams small {
   color: #7a8791;
   font-weight: 800;
+}
+
+.live-score {
+  color: #9f5c00;
+  animation: live-score-pulse 1.5s ease-in-out infinite;
+}
+
+.live-match-badge {
+  justify-self: end;
+  margin-right: 10px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  color: #6d4a00;
+  background: #fff0b3;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+@keyframes live-score-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.48;
+  }
 }
 
 .standings-panel h3 {

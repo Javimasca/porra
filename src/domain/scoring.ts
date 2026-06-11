@@ -38,6 +38,12 @@ const knockoutSignBonusTables: Record<string, Record<number, number>> = {
   },
 }
 
+function countsForLiveScore(match: Match) {
+  return (match.status === 'finalizado' || match.status === 'en_juego') &&
+    match.homeScore !== undefined &&
+    match.awayScore !== undefined
+}
+
 export function buildLeaderboard(
   participants: Participant[],
   predictions: PredictionSlip[],
@@ -64,7 +70,7 @@ export function buildLeaderboard(
 
 export function scorePrediction(prediction: PredictionSlip, state: TournamentState): ScoreBreakdown[] {
   const groupMatchPoints = state.matches.reduce((sum, match) => {
-    if (match.stage !== 'Grupo' || match.status !== 'finalizado') {
+    if (match.stage !== 'Grupo' || !countsForLiveScore(match)) {
       return sum
     }
 
@@ -73,7 +79,7 @@ export function scorePrediction(prediction: PredictionSlip, state: TournamentSta
   }, 0)
 
   const knockoutPoints = state.matches.reduce((sum, match) => {
-    if (match.stage === 'Grupo' || match.status !== 'finalizado') {
+    if (match.stage === 'Grupo' || !countsForLiveScore(match)) {
       return sum
     }
 
@@ -99,7 +105,7 @@ export function scorePrediction(prediction: PredictionSlip, state: TournamentSta
 export function scorePredictionDetails(prediction: PredictionSlip, state: TournamentState) {
   const matches = Object.fromEntries(
     state.matches
-      .filter((match) => match.status === 'finalizado')
+      .filter(countsForLiveScore)
       .map((match) => {
         const pick = prediction.matches.find((item) => item.matchId === match.id)
         const points = pick
