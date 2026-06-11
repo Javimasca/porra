@@ -756,7 +756,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     })
   }
   const saveOfficialResults = async () => {
-    if (!apiReady || !adminAuthenticated) {
+    if (!adminAuthenticated) {
       window.alert('Entra como admin antes de guardar resultados.')
       return
     }
