@@ -235,6 +235,7 @@ function App() {
   const [reviewParticipantId, setReviewParticipantId] = useState<string | null>(null)
   const [selectedPredictionParticipantId, setSelectedPredictionParticipantId] = useState('')
   const [selectedPublicPredictionParticipantId, setSelectedPublicPredictionParticipantId] = useState('')
+  const [expandedLeaderboardParticipantId, setExpandedLeaderboardParticipantId] = useState<string | null>(null)
   const [selectedPublicPredictionScope, setSelectedPublicPredictionScope] = useState('all')
   const [selectedKnockoutParticipantId, setSelectedKnockoutParticipantId] = useState('')
   const [activeKnockoutStage, setActiveKnockoutStage] = useState<(typeof knockoutStages)[number]>('Ronda de 32')
@@ -511,7 +512,7 @@ if (!tournamentResponse.ok) {
     ? publicVisiblePredictionsByName.filter(
         (prediction) => prediction.participantId === selectedPublicPredictionParticipantId,
       )
-    : publicVisiblePredictionsByName
+    : []
   const visibleGroups = selectedPublicPredictionScope.startsWith('group-')
     ? [selectedPublicPredictionScope.replace('group-', '')]
     : groups
@@ -535,6 +536,21 @@ if (!tournamentResponse.ok) {
     [participants, leaderboardPredictions, scoringTournamentState],
   )
   const liveScoreNotice = hasLiveMatches ? <span className="live-score-notice">Incluye partidos en juego</span> : null
+  useEffect(() => {
+    if (selectedPublicPredictionParticipantId || !publicParticipantPrediction?.locked) {
+      return
+    }
+
+    const hasVisiblePrediction = publicVisiblePredictions.some(
+      (prediction) => prediction.participantId === publicParticipantPrediction.participantId,
+    )
+
+    if (hasVisiblePrediction) {
+      queueMicrotask(() => {
+        setSelectedPublicPredictionParticipantId(publicParticipantPrediction.participantId)
+      })
+    }
+  }, [publicParticipantPrediction, publicVisiblePredictions, selectedPublicPredictionParticipantId])
   const selectedPrediction = predictions.find(
     (prediction) => prediction.participantId === selectedPredictionParticipantId,
   )
@@ -1616,7 +1632,7 @@ type="button"
                       onChange={(event) => setSelectedPublicPredictionParticipantId(event.target.value)}
                       value={selectedPublicPredictionParticipantId}
                     >
-                      <option value="">Todos</option>
+                      <option value="">Elige participante</option>
                       {publicVisiblePredictionsByName.map((prediction) => {
                         const participant = participants.find((item) => item.id === prediction.participantId)
                         return (
@@ -1646,7 +1662,13 @@ type="button"
                   </label>
                 </div>
 
-                {filteredPublicPredictions.length === 0 && (
+                {!selectedPublicPredictionParticipantId && (
+                  <div className="panel">
+                    <p>Selecciona un participante para ver su pronostico.</p>
+                  </div>
+                )}
+
+                {selectedPublicPredictionParticipantId && filteredPublicPredictions.length === 0 && (
                   <div className="panel">
                     <p>
                       No hay pronosticos visibles para este filtro. Comprueba que la fase este cerrada y que existan
@@ -2850,25 +2872,37 @@ setMatchPredictions((current) => {
             </header>
 
             <div className="leaderboard-page">
-              {leaderboard.map((entry, index) => (
-                <article className="leaderboard-card" key={entry.participant.id}>
-                  <div className="leaderboard-rank">
-                    <strong>{index + 1}</strong>
-                    <span>{entry.total} pts</span>
-                  </div>
-                  <div className="leaderboard-detail">
-                    <h3>{entry.participant.name}</h3>
-                    <div className="score-breakdown">
-                      {entry.breakdown.map((item) => (
-                        <div className="score-pill" key={item.label}>
-                          <span>{item.label}</span>
-                          <strong>{item.points}</strong>
-                        </div>
-                      ))}
+              {leaderboard.map((entry, index) => {
+                const expanded = expandedLeaderboardParticipantId === entry.participant.id
+
+                return (
+                  <article
+                    className={expanded ? 'leaderboard-card leaderboard-card-expanded' : 'leaderboard-card'}
+                    key={entry.participant.id}
+                    onDoubleClick={() => {
+                      setExpandedLeaderboardParticipantId(expanded ? null : entry.participant.id)
+                    }}
+                  >
+                    <div className="leaderboard-rank">
+                      <strong>{index + 1}</strong>
                     </div>
-                  </div>
-                </article>
-              ))}
+                    <div className="leaderboard-detail">
+                      <h3>{entry.participant.name}</h3>
+                      {expanded && (
+                        <div className="score-breakdown">
+                          {entry.breakdown.map((item) => (
+                            <div className="score-pill" key={item.label}>
+                              <span>{item.label}</span>
+                              <strong>{item.points}</strong>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <strong className="leaderboard-total">{entry.total} pts</strong>
+                  </article>
+                )
+              })}
             </div>
           </section>
         )}
