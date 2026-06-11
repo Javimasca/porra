@@ -490,10 +490,6 @@ if (!tournamentResponse.ok) {
     }),
     [qualification, resolvedTournamentState],
   )
-  const leaderboard = useMemo(
-    () => buildLeaderboard(participants, predictions, scoringTournamentState),
-    [participants, predictions, scoringTournamentState],
-  )
   const visibleTabs = mode === 'publico' ? publicTabs : adminTabs
   const closedPredictionStages = getClosedPredictionStages(predictionPhase)
   const publicVisiblePredictions = publicPredictions.filter((prediction) => prediction.locked)
@@ -521,6 +517,11 @@ if (!tournamentResponse.ok) {
       ]),
     ),
     [predictions, publicPredictions, scoringTournamentState],
+  )
+  const leaderboardPredictions = mode === 'publico' ? publicPredictions : predictions
+  const leaderboard = useMemo(
+    () => buildLeaderboard(participants, leaderboardPredictions, scoringTournamentState),
+    [participants, leaderboardPredictions, scoringTournamentState],
   )
   const selectedPrediction = predictions.find(
     (prediction) => prediction.participantId === selectedPredictionParticipantId,
