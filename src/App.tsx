@@ -481,7 +481,10 @@ if (!tournamentResponse.ok) {
   )
   const visibleTabs = mode === 'publico' ? publicTabs : adminTabs
   const closedPredictionStages = getClosedPredictionStages(predictionPhase)
-  const publicVisiblePredictions = publicPredictions.filter((prediction) => prediction.locked)
+  const validatedParticipantIds = new Set(validatedParticipants.map((participant) => participant.id))
+  const publicVisiblePredictions = publicPredictions.filter(
+    (prediction) => prediction.locked && validatedParticipantIds.has(prediction.participantId),
+  )
   const publicVisiblePredictionsByName = [...publicVisiblePredictions].sort((a, b) =>
     participantName(participants, a.participantId).localeCompare(participantName(participants, b.participantId)),
   )
@@ -2617,7 +2620,7 @@ setMatchPredictions((current) => {
                   value={selectedKnockoutParticipantId}
                 >
                   <option value="">Seleccionar</option>
-                  {validatedParticipants.map((participant) => (
+                  {sortParticipantsByName(validatedParticipants).map((participant) => (
                     <option key={participant.id} value={participant.id}>{participant.name}</option>
                   ))}
                 </select>
