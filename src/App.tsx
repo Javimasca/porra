@@ -512,10 +512,7 @@ if (!tournamentResponse.ok) {
   )
 const selectedPredictionIsLocked = selectedPrediction?.locked ?? false
 
-const initialPredictionClosed =
-  predictionPhase === 'groupsClosed' ||
-  predictionPhase === 'knockoutsOpen' ||
-  predictionPhase === 'closed'
+const initialPredictionClosed = predictionPhase !== 'preGroups'
 
 const currentKnockoutStage =
   predictionPhase === 'Ronda de 32' ||
@@ -563,6 +560,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
   const enteredAccessCode = publicForm.accessCode.trim()
   const publicCodeHasInput = enteredAccessCode.length > 0
   const publicFormRequiredCount = publicFormErrors.length
+  const publicGroupFormDisabled = Boolean(publicParticipantPrediction?.locked) || initialPredictionClosed
   const resetPublicForm = (accessCode = '') => {
     setPublicForm({
       accessCode,
@@ -1087,10 +1085,10 @@ type="button"
                       <h3>Predicción pre-torneo</h3>
                       <div className="meta-grid">
                         <TeamSelect
-  disabled={publicParticipantPrediction?.locked}
+  disabled={publicGroupFormDisabled}
   label="Campeon"
   onChange={(value) => {
-  if (publicParticipantPrediction?.locked) {
+  if (publicGroupFormDisabled) {
     return
   }
 
@@ -1102,10 +1100,10 @@ type="button"
                           Máximo goleador
                          
                             <input
-  disabled={publicParticipantPrediction?.locked}
+  disabled={publicGroupFormDisabled}
 
     onChange={(event) => {
-  if (publicParticipantPrediction?.locked) {
+  if (publicGroupFormDisabled) {
     return
   }
 
@@ -1122,9 +1120,9 @@ type="button"
                         <label>
                           MVP del torneo
                           <input
-  disabled={publicParticipantPrediction?.locked}
+  disabled={publicGroupFormDisabled}
   onChange={(event) => {
-  if (publicParticipantPrediction?.locked) {
+  if (publicGroupFormDisabled) {
     return
   }
 
@@ -1139,11 +1137,11 @@ type="button"
                         </label>
                       </div>
                       <MultiTeamPicker
-  disabled={publicParticipantPrediction?.locked}
+  disabled={publicGroupFormDisabled}
   label="Semifinalistas"
   limit={4}
   onChange={(teams) => {
-  if (publicParticipantPrediction?.locked) {
+  if (publicGroupFormDisabled) {
     return
   }
 
@@ -1176,7 +1174,7 @@ type="button"
                                 Grupo <span translate="no">{group}</span>
                               </h4>
                               <TeamSelect
-  disabled={publicParticipantPrediction?.locked}
+  disabled={publicGroupFormDisabled}
   label="Primero"
                                 onChange={(value) =>
                                   setPublicForm((form) => ({
@@ -1188,7 +1186,7 @@ type="button"
                                 value={publicForm.groupWinners[group] ?? ''}
                               />
                               <MultiTeamPicker
-  disabled={publicParticipantPrediction?.locked}
+  disabled={publicGroupFormDisabled}
   label="Clasificados"
                                 limit={2}
                                 onChange={(teams) =>
@@ -1212,7 +1210,7 @@ type="button"
                       <div className="prediction-board">
                         {groups.map((group) => (
                           <PredictionGroup
-  disabled={publicParticipantPrediction?.locked}
+  disabled={publicGroupFormDisabled}
   group={group}
   key={group}
   matches={tournamentState.matches.filter((match) => match.group === group)}
@@ -1310,7 +1308,7 @@ type="button"
                         </p>
                       </div>
                       <div className="greeting-actions">
-                        {!publicParticipantPrediction.locked && (
+                        {!publicParticipantPrediction.locked && !initialPredictionClosed && (
                           <button
                             className="primary-action"
                             onClick={() => {
@@ -1866,7 +1864,9 @@ type="button"
                     <div className="row-actions">
                       <button
                         className="small-action"
+                        disabled={initialPredictionClosed}
                         onClick={async () => {
+                          if (initialPredictionClosed) return
                           const nextPredictions = predictions.map((item) =>
                               item.participantId === prediction.participantId
                                 ? {
@@ -2216,6 +2216,7 @@ type="button"
                     ),
                   )
                 }}
+                groupEditingClosed={initialPredictionClosed}
                 participant={participants.find((participant) => participant.id === reviewParticipantId)}
                 prediction={predictions.find((prediction) => prediction.participantId === reviewParticipantId)}
                 tournamentState={tournamentState}
@@ -2243,7 +2244,7 @@ type="button"
                 </button>
                 <button
                   className="primary-action"
-                  disabled={!selectedPredictionParticipantId}
+                  disabled={!selectedPredictionParticipantId || initialPredictionClosed}
                   onClick={() => {
                     const matches = Object.values(matchPredictions).filter(
                       (prediction) =>
@@ -2286,9 +2287,13 @@ type="button"
                 </button>
                 <button
                   className="secondary-action"
-                  disabled={!selectedPredictionParticipantId}
+                  disabled={!selectedPredictionParticipantId || (Boolean(selectedPrediction?.locked) && initialPredictionClosed)}
                   onClick={async () => {
                     const reopen = Boolean(selectedPrediction?.locked)
+                    if (reopen && initialPredictionClosed) {
+                      window.alert('La fase de grupos esta cerrada. Para reabrir predicciones, cambia la fase a preGroups.')
+                      return
+                    }
                     if (reopen) {
                       const saved = await updateAdminReopenRequest(selectedPredictionParticipantId, true, adminPinInput)
                       if (!saved) {
@@ -3121,12 +3126,14 @@ function OfficialResultRow({
 }
 
 function PredictionReview({
+  groupEditingClosed,
   onClose,
   onToggleLocked,
   participant,
   prediction,
   tournamentState,
 }: {
+  groupEditingClosed: boolean
   onClose: () => void
   onToggleLocked: (locked: boolean) => void
   participant?: Participant
@@ -3167,6 +3174,7 @@ function PredictionReview({
           {prediction && (
   <button
     className="small-action"
+    disabled={prediction.locked && groupEditingClosed}
     onClick={() => onToggleLocked(!prediction.locked)}
     type="button"
   >

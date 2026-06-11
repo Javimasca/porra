@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { getPrisma } from '../../../../src/lib/prisma'
+import { isPredictionPhase } from '../../../../src/domain/phases'
 
 function createVerificationCode() {
   return `PORRA-2026-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
@@ -74,6 +75,21 @@ function isSubmitPayload(value: unknown): value is {
   )
 }
 
+async function currentPredictionPhase() {
+  const prisma = getPrisma()
+  await prisma.$executeRaw`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `
+  const rows = await prisma.$queryRaw<Array<{ value: string }>>`
+    SELECT value FROM app_settings WHERE key = 'predictionPhase' LIMIT 1
+  `
+  return isPredictionPhase(rows[0]?.value) ? rows[0].value : 'preGroups'
+}
+
 export async function POST(request: Request) {
   try {
     const prisma = getPrisma()
@@ -81,6 +97,10 @@ export async function POST(request: Request) {
 
     if (!isSubmitPayload(payload)) {
       return NextResponse.json({ error: 'Invalid prediction payload' }, { status: 400 })
+    }
+
+    if (await currentPredictionPhase() !== 'preGroups') {
+      return NextResponse.json({ error: 'Group predictions are closed' }, { status: 409 })
     }
 
     const participant = await prisma.participant.findUnique({
