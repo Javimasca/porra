@@ -762,14 +762,23 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     }
 
     const saved = await syncApi('/api/tournament', tournamentState, adminPinInput)
-    if (!saved || !Array.isArray(saved.matches)) {
+    if (!saved) {
       window.alert('No se pudieron guardar los resultados. Revisa la conexion o el PIN admin.')
+      return
+    }
+
+    const savedMatches = Array.isArray(saved.matches)
+      ? saved.matches
+      : await loadTournamentMatches()
+
+    if (!savedMatches) {
+      window.alert('Los resultados se han enviado, pero no se pudieron recargar. Refresca la pagina para comprobarlos.')
       return
     }
 
     setTournamentState({
       ...tournamentState,
-      matches: saved.matches.map(normalizeMatch),
+      matches: savedMatches.map(normalizeMatch),
     })
   }
 
@@ -3884,6 +3893,19 @@ async function loadPublicPredictions() {
   } catch (error) {
     console.error('No se pudieron cargar predicciones publicas', error)
     return []
+  }
+}
+
+async function loadTournamentMatches() {
+  try {
+    const response = await fetch('/api/tournament', { cache: 'no-store' })
+    if (!response.ok) return null
+
+    const tournament = await response.json()
+    return Array.isArray(tournament.matches) ? tournament.matches : null
+  } catch (error) {
+    console.error('No se pudo cargar torneo', error)
+    return null
   }
 }
 
