@@ -755,6 +755,23 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
       matches: saved.matches.map(normalizeMatch),
     })
   }
+  const saveOfficialResults = async () => {
+    if (!apiReady || !adminAuthenticated) {
+      window.alert('Entra como admin antes de guardar resultados.')
+      return
+    }
+
+    const saved = await syncApi('/api/tournament', tournamentState, adminPinInput)
+    if (!saved || !Array.isArray(saved.matches)) {
+      window.alert('No se pudieron guardar los resultados. Revisa la conexion o el PIN admin.')
+      return
+    }
+
+    setTournamentState({
+      ...tournamentState,
+      matches: saved.matches.map(normalizeMatch),
+    })
+  }
 
   return (
     <main className="app-shell">
@@ -2749,6 +2766,13 @@ setMatchPredictions((current) => {
                 >
                   Reiniciar resultados
                 </button>
+                <button
+                  className="primary-action"
+                  onClick={saveOfficialResults}
+                  type="button"
+                >
+                  Guardar resultados
+                </button>
               </div>
             </header>
             <div className="results-board">
@@ -2778,7 +2802,11 @@ setMatchPredictions((current) => {
 
                               return {
                                 ...nextMatch,
-                                status: hasResult ? nextMatch.status : 'programado',
+                                status: hasResult
+                                  ? nextMatch.status === 'programado'
+                                    ? 'en_juego'
+                                    : nextMatch.status
+                                  : 'programado',
                               }
                             }),
                           }))

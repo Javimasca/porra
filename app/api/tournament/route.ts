@@ -99,7 +99,11 @@ export async function PUT(request: Request) {
       ),
     )
 
-    return NextResponse.json({ ok: true })
+    const matches = await prisma.match.findMany({
+      orderBy: [{ stage: 'asc' }, { date: 'asc' }, { id: 'asc' }],
+    })
+
+    return NextResponse.json({ ok: true, matches })
   } catch {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
   }
