@@ -16,6 +16,49 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Unknown database error'
 }
 
+function sameNullableDate(left: Date | null, right?: string) {
+  const parsedRight = dateFromMatch(right)
+  return (left?.getTime() ?? null) === (parsedRight?.getTime() ?? null)
+}
+
+function matchChanged(
+  current: {
+    group: string | null
+    stage: string
+    date: Date | null
+    venue: string | null
+    home: string
+    away: string
+    homeScore: number | null
+    awayScore: number | null
+    penaltyWinner: string | null
+    status: string
+  },
+  next: {
+    group?: string
+    stage: string
+    date?: string
+    venue?: string
+    home: string
+    away: string
+    homeScore?: number
+    awayScore?: number
+    penaltyWinner?: string
+    status: string
+  },
+) {
+  return current.group !== (next.group ?? null) ||
+    current.stage !== next.stage ||
+    !sameNullableDate(current.date, next.date) ||
+    current.venue !== (next.venue ?? null) ||
+    current.home !== next.home ||
+    current.away !== next.away ||
+    current.homeScore !== (next.homeScore ?? null) ||
+    current.awayScore !== (next.awayScore ?? null) ||
+    current.penaltyWinner !== (next.penaltyWinner ?? null) ||
+    current.status !== next.status
+}
+
 function isMatch(value: unknown): value is {
   id: string
   group?: string
@@ -77,38 +120,48 @@ export async function PUT(request: Request) {
       )
     }
 
-    await prisma.$transaction(
-      state.matches.map((match) =>
-        prisma.match.upsert({
-          where: { id: match.id },
-          update: {
-            group: match.group,
-            stage: match.stage,
-            date: dateFromMatch(match.date),
-            venue: match.venue,
-            home: match.home,
-            away: match.away,
-            homeScore: match.homeScore ?? null,
-            awayScore: match.awayScore ?? null,
-            penaltyWinner: match.penaltyWinner ?? null,
-            status: match.status,
-          },
-          create: {
-            id: match.id,
-            group: match.group,
-            stage: match.stage,
-            date: dateFromMatch(match.date),
-            venue: match.venue,
-            home: match.home,
-            away: match.away,
-            homeScore: match.homeScore ?? null,
-            awayScore: match.awayScore ?? null,
-            penaltyWinner: match.penaltyWinner ?? null,
-            status: match.status,
-          },
-        }),
-      ),
-    )
+    const existingMatches = await prisma.match.findMany()
+    const existingById = new Map(existingMatches.map((match) => [match.id, match]))
+    const changedMatches = state.matches.filter((match) => {
+      const current = existingById.get(match.id)
+      return !current || matchChanged(current, match)
+    })
+
+    if (changedMatches.length > 0) {
+      await prisma.$transaction(
+        changedMatches.map((match) =>
+          prisma.match.upsert({
+            where: { id: match.id },
+            update: {
+              group: match.group,
+              stage: match.stage,
+              date: dateFromMatch(match.date),
+              venue: match.venue,
+              home: match.home,
+              away: match.away,
+              homeScore: match.homeScore ?? null,
+              awayScore: match.awayScore ?? null,
+              penaltyWinner: match.penaltyWinner ?? null,
+              status: match.status,
+            },
+            create: {
+              id: match.id,
+              group: match.group,
+              stage: match.stage,
+              date: dateFromMatch(match.date),
+              venue: match.venue,
+              home: match.home,
+              away: match.away,
+              homeScore: match.homeScore ?? null,
+              awayScore: match.awayScore ?? null,
+              penaltyWinner: match.penaltyWinner ?? null,
+              status: match.status,
+            },
+          }),
+        ),
+        { timeout: 20000 },
+      )
+    }
 
     const matches = await prisma.match.findMany({
       orderBy: [{ stage: 'asc' }, { date: 'asc' }, { id: 'asc' }],
