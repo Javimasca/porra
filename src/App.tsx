@@ -797,6 +797,24 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
       matches: savedMatches.map(normalizeMatch),
     })
   }
+  const saveParticipants = async (nextParticipants = participants) => {
+    if (!adminAuthenticated) {
+      window.alert('Entra como admin antes de guardar participantes.')
+      return false
+    }
+
+    const saved = await saveParticipantsState(nextParticipants, adminPinInput)
+    if (!saved.ok) {
+      window.alert(`No se pudieron guardar los participantes. ${saved.error}`)
+      return false
+    }
+
+    if (Array.isArray(saved.data.participants)) {
+      setParticipants(saved.data.participants.map(normalizeParticipantAccessCode))
+    }
+
+    return true
+  }
 
   return (
     <main className="app-shell">
@@ -2211,8 +2229,15 @@ type="button"
                         <div className="row-actions">
                           <button
                             className="small-action"
-                            onClick={() => {
-                              setEditingParticipantId((current) => (current === player.id ? null : player.id))
+                            onClick={async () => {
+                              if (editingParticipantId === player.id) {
+                                const saved = await saveParticipants()
+                                if (!saved) return
+                                setEditingParticipantId(null)
+                                return
+                              }
+
+                              setEditingParticipantId(player.id)
                             }}
                             type="button"
                           >
@@ -3883,6 +3908,43 @@ async function saveTournamentState(state: TournamentState, adminPin?: string): P
         ...(adminPin ? { 'x-admin-pin': adminPin } : {}),
       },
       body: JSON.stringify(state),
+    })
+    const text = await response.text()
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: `HTTP ${response.status}: ${text || response.statusText}`,
+      }
+    }
+
+    return {
+      ok: true,
+      data: text ? JSON.parse(text) : {},
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Error de red desconocido',
+    }
+  }
+}
+
+async function saveParticipantsState(participants: Participant[], adminPin?: string): Promise<{
+  ok: true
+  data: { participants?: Participant[] }
+} | {
+  ok: false
+  error: string
+}> {
+  try {
+    const response = await fetch('/api/participants', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(adminPin ? { 'x-admin-pin': adminPin } : {}),
+      },
+      body: JSON.stringify(participants),
     })
     const text = await response.text()
 

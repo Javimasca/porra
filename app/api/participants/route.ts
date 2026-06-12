@@ -56,8 +56,8 @@ export async function PUT(request: Request) {
       )
     }
 
-    await prisma.$transaction([
-      ...participants.map((participant) =>
+    await prisma.$transaction(
+      participants.map((participant) =>
         prisma.participant.upsert({
           where: { id: participant.id },
           update: {
@@ -75,11 +75,22 @@ export async function PUT(request: Request) {
           },
         }),
       ),
-    ])
+      { timeout: 20000 },
+    )
 
-    return NextResponse.json({ ok: true })
+    const savedParticipants = await prisma.participant.findMany({
+      orderBy: { createdAt: 'asc' },
+    })
+
+    return NextResponse.json({ ok: true, participants: savedParticipants })
   } catch (error) {
     console.error('PUT /api/participants error:', error)
-    return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
+    return NextResponse.json(
+      {
+        error: 'Database unavailable',
+        detail: error instanceof Error ? error.message : 'Unknown database error',
+      },
+      { status: 503 },
+    )
   }
 }
