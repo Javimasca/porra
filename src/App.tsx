@@ -14,7 +14,7 @@ type AutoTableDocument = jsPDF & {
 }
 
 const publicTabs = ['Formulario', 'Pronosticos', 'Cuadro', 'Clasificacion', 'Reglas'] as const
-const adminTabs = ['Panel', 'Solicitudes', 'Cuadro', 'Participantes', 'Predicciones', 'Eliminatorias', 'Resultados', 'Clasificacion', 'Reglas'] as const
+const adminTabs = ['Panel', 'Solicitudes', 'Cuadro', 'Participantes', 'Predicciones', 'Eliminatorias', 'Resultados', 'Bonus', 'Clasificacion', 'Reglas'] as const
 type Tab = (typeof publicTabs)[number] | (typeof adminTabs)[number]
 type TeamStanding = {
   team: string
@@ -43,8 +43,38 @@ const allTeams = Array.from(
     .flatMap((match) => [match.home, match.away])),
 ).sort((a, b) => a.localeCompare(b))
 
+function normalizeNameKey(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function participantName(participants: Participant[], participantId: string) {
   return participants.find((participant) => participant.id === participantId)?.name ?? ''
+}
+
+function buildNameVariants(predictions: PredictionSlip[], field: 'topScorer' | 'mvp') {
+  const variants = new Map<string, { value: string; count: number; normalized: string }>()
+
+  predictions.forEach((prediction) => {
+    const value = prediction[field].trim()
+    if (!value) return
+
+    const current = variants.get(value)
+    variants.set(value, {
+      value,
+      count: (current?.count ?? 0) + 1,
+      normalized: normalizeNameKey(value),
+    })
+  })
+
+  return Array.from(variants.values()).sort((a, b) =>
+    a.normalized.localeCompare(b.normalized) || a.value.localeCompare(b.value),
+  )
 }
 
 function sortParticipantsByName(participants: Participant[]) {
@@ -333,6 +363,8 @@ if (!tournamentResponse.ok) {
         if (Array.isArray(apiTournament.matches)) {
           setTournamentState({
             ...initialTournamentState,
+            topScorer: typeof apiTournament.topScorer === 'string' ? apiTournament.topScorer : undefined,
+            mvp: typeof apiTournament.mvp === 'string' ? apiTournament.mvp : undefined,
             matches: apiTournament.matches.map(normalizeMatch),
           })
         }
@@ -535,6 +567,8 @@ if (!tournamentResponse.ok) {
     () => buildLeaderboard(participants, leaderboardPredictions, scoringTournamentState),
     [participants, leaderboardPredictions, scoringTournamentState],
   )
+  const topScorerVariants = useMemo(() => buildNameVariants(predictions, 'topScorer'), [predictions])
+  const mvpVariants = useMemo(() => buildNameVariants(predictions, 'mvp'), [predictions])
   const liveScoreNotice = hasLiveMatches ? <span className="live-score-notice">Incluye partidos en juego</span> : null
   useEffect(() => {
     if (selectedPublicPredictionParticipantId || !publicParticipantPrediction?.locked) {
@@ -794,6 +828,8 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
 
     setTournamentState({
       ...tournamentState,
+      topScorer: typeof saved.data.topScorer === 'string' ? saved.data.topScorer : tournamentState.topScorer,
+      mvp: typeof saved.data.mvp === 'string' ? saved.data.mvp : tournamentState.mvp,
       matches: savedMatches.map(normalizeMatch),
     })
   }
@@ -814,6 +850,18 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     }
 
     return true
+  }
+  const applyNameNormalization = async (field: 'topScorer' | 'mvp', from: string) => {
+    const to = window.prompt(`Nombre correcto para "${from}"`, from)?.trim()
+    if (!to || to === from) return
+
+    const saved = await normalizePredictionNames(field, from, to, adminPinInput)
+    if (!saved) {
+      window.alert('No se pudieron normalizar los nombres. Revisa la conexion o el PIN admin.')
+      return
+    }
+
+    setPredictions(saved.predictions.map(normalizePredictionSlip))
   }
 
   return (
@@ -2883,6 +2931,72 @@ setMatchPredictions((current) => {
           </section>
         )}
 
+        {activeTab === 'Bonus' && (
+          <section>
+            <header className="section-header">
+              <div>
+                <p className="eyebrow">Panel admin</p>
+                <h2>Bonus y normalizacion de nombres</h2>
+              </div>
+              <button
+                className="primary-action"
+                onClick={saveOfficialResults}
+                type="button"
+              >
+                Guardar bonus
+              </button>
+            </header>
+
+            <section className="content-grid">
+              <div className="panel">
+                <div className="panel-title">
+                  <h3>Resultados actuales</h3>
+                  <span>aplican a la clasificacion</span>
+                </div>
+                <div className="meta-grid">
+                  <label>
+                    Maximo goleador/es
+                    <input
+                      onChange={(event) => {
+                        setTournamentState((current) => ({ ...current, topScorer: event.target.value }))
+                      }}
+                      placeholder="Kylian Mbappe, Harry Kane"
+                      value={tournamentState.topScorer ?? ''}
+                    />
+                  </label>
+                  <label>
+                    MVP
+                    <input
+                      onChange={(event) => {
+                        setTournamentState((current) => ({ ...current, mvp: event.target.value }))
+                      }}
+                      placeholder="Nombre oficial del MVP"
+                      value={tournamentState.mvp ?? ''}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="panel">
+                <div className="panel-title">
+                  <h3>Normalizar respuestas</h3>
+                  <span>{predictions.length} porras</span>
+                </div>
+                <NameVariantList
+                  onApply={(from) => applyNameNormalization('topScorer', from)}
+                  title="Maximo goleador"
+                  variants={topScorerVariants}
+                />
+                <NameVariantList
+                  onApply={(from) => applyNameNormalization('mvp', from)}
+                  title="MVP"
+                  variants={mvpVariants}
+                />
+              </div>
+            </section>
+          </section>
+        )}
+
         {activeTab === 'Clasificacion' && (
           <section>
             <header className="section-header">
@@ -3381,6 +3495,41 @@ function PredictionReview({
         </div>
       )}
     </section>
+  )
+}
+
+function NameVariantList({
+  onApply,
+  title,
+  variants,
+}: {
+  onApply: (from: string) => void
+  title: string
+  variants: Array<{ value: string; count: number; normalized: string }>
+}) {
+  return (
+    <div className="name-variant-list">
+      <h4>{title}</h4>
+      {variants.length === 0 ? (
+        <p className="form-description">No hay respuestas registradas.</p>
+      ) : (
+        variants.map((variant) => (
+          <div className="name-variant-row" key={`${title}-${variant.value}`}>
+            <div>
+              <strong>{variant.value}</strong>
+              <span>{variant.count} respuesta{variant.count === 1 ? '' : 's'} · {variant.normalized}</span>
+            </div>
+            <button
+              className="small-action"
+              onClick={() => onApply(variant.value)}
+              type="button"
+            >
+              Aplicar
+            </button>
+          </div>
+        ))
+      )}
+    </div>
   )
 }
 
@@ -3895,7 +4044,7 @@ async function syncApi(path: string, body: unknown, adminPin?: string) {
 
 async function saveTournamentState(state: TournamentState, adminPin?: string): Promise<{
   ok: true
-  data: { matches?: Match[] }
+  data: { matches?: Match[]; topScorer?: string; mvp?: string }
 } | {
   ok: false
   error: string
@@ -4134,6 +4283,35 @@ async function submitPublicKnockoutPredictions(
     return response.json()
   } catch (error) {
     console.error('No se pudieron guardar las eliminatorias publicas', error)
+    return null
+  }
+}
+
+async function normalizePredictionNames(
+  field: 'topScorer' | 'mvp',
+  from: string,
+  to: string,
+  adminPin: string,
+): Promise<{ predictions: PredictionSlip[] } | null> {
+  try {
+    const response = await fetch('/api/predictions/admin-normalize-names', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(adminPin ? { 'x-admin-pin': adminPin } : {}),
+      },
+      body: JSON.stringify({ field, from, to }),
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`HTTP ${response.status}: ${text}`)
+    }
+
+    const result = await response.json()
+    return Array.isArray(result.predictions) ? { predictions: result.predictions } : null
+  } catch (error) {
+    console.error('No se pudieron normalizar nombres', error)
     return null
   }
 }

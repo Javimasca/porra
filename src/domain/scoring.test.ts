@@ -229,4 +229,24 @@ describe('scorePrediction', () => {
     assert.equal(pointsFor('Partidos de grupo', prediction, state), 3)
     assert.equal(scorePredictionDetails(prediction, state).matches['g-a-1'], 3)
   })
+
+  it('scores comma-separated top scorers and normalized MVP names', () => {
+    const state: TournamentState = {
+      topScorer: 'Kylian Mbappé, Harry Kane',
+      mvp: 'Rodrigo Hernández',
+      semifinalists: [],
+      groupWinners: {},
+      groupQualified: {},
+      bestThirds: [],
+      matches: [],
+    }
+    const prediction: PredictionSlip = {
+      ...basePrediction,
+      topScorer: 'Kylian Mbappe',
+      mvp: 'Rodrigo Hernandez',
+    }
+
+    assert.equal(pointsFor('Goleador', prediction, state), 25)
+    assert.equal(pointsFor('MVP', prediction, state), 25)
+  })
 })

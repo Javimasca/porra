@@ -44,6 +44,33 @@ function countsForLiveScore(match: Match) {
     match.awayScore !== undefined
 }
 
+function normalizeName(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function commaSeparatedNames(value?: string) {
+  return (value ?? '')
+    .split(',')
+    .map(normalizeName)
+    .filter(Boolean)
+}
+
+function nameMatches(value: string, target?: string) {
+  const normalizedValue = normalizeName(value)
+  return Boolean(normalizedValue && target && normalizeName(target) === normalizedValue)
+}
+
+function nameMatchesAny(value: string, targets?: string) {
+  const normalizedValue = normalizeName(value)
+  return Boolean(normalizedValue && commaSeparatedNames(targets).includes(normalizedValue))
+}
+
 export function buildLeaderboard(
   participants: Participant[],
   predictions: PredictionSlip[],
@@ -97,8 +124,8 @@ export function scorePrediction(prediction: PredictionSlip, state: TournamentSta
     { label: 'Bonus eliminatorias', points: scoreKnockoutSignBonuses(prediction, state) },
     { label: 'Semifinalistas', points: scoreSemifinalists(prediction, state) },
     { label: 'Campeon', points: state.champion && prediction.champion === state.champion ? 40 : 0 },
-    { label: 'Goleador', points: state.topScorer && prediction.topScorer === state.topScorer ? 25 : 0 },
-    { label: 'MVP', points: state.mvp && prediction.mvp === state.mvp ? 25 : 0 },
+    { label: 'Goleador', points: nameMatchesAny(prediction.topScorer, state.topScorer) ? 25 : 0 },
+    { label: 'MVP', points: nameMatches(prediction.mvp, state.mvp) ? 25 : 0 },
   ]
 }
 

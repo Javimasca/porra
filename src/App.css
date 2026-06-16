@@ -589,6 +589,39 @@ td {
   color: #12343b;
 }
 
+.name-variant-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.name-variant-list h4 {
+  margin: 0;
+  color: #12343b;
+}
+
+.name-variant-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #dbe1e6;
+  border-radius: 8px;
+  background: #f7faf9;
+}
+
+.name-variant-row div {
+  display: grid;
+  gap: 3px;
+}
+
+.name-variant-row span {
+  color: #65717c;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
 .review-panel {
   margin-top: 20px;
   padding: 18px;

@@ -16,6 +16,39 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Unknown database error'
 }
 
+async function ensureSettingsTable(prisma: ReturnType<typeof getPrisma>) {
+  await prisma.$executeRaw`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `
+}
+
+async function readTournamentBonus(prisma: ReturnType<typeof getPrisma>) {
+  await ensureSettingsTable(prisma)
+  const rows = await prisma.$queryRaw<Array<{ key: string; value: string }>>`
+    SELECT key, value FROM app_settings WHERE key IN ('topScorer', 'mvp')
+  `
+  const settings = new Map(rows.map((row) => [row.key, row.value]))
+
+  return {
+    topScorer: settings.get('topScorer') || undefined,
+    mvp: settings.get('mvp') || undefined,
+  }
+}
+
+async function saveSetting(prisma: ReturnType<typeof getPrisma>, key: string, value: string) {
+  await prisma.$executeRaw`
+    INSERT INTO app_settings (key, value, updated_at)
+    VALUES (${key}, ${value}, NOW())
+    ON CONFLICT (key) DO UPDATE
+    SET value = EXCLUDED.value,
+        updated_at = NOW()
+  `
+}
+
 function sameNullableDate(left: Date | null, right?: string) {
   const parsedRight = dateFromMatch(right)
   return (left?.getTime() ?? null) === (parsedRight?.getTime() ?? null)
@@ -98,8 +131,9 @@ export async function GET() {
     const matches = await prisma.match.findMany({
       orderBy: [{ stage: 'asc' }, { date: 'asc' }, { id: 'asc' }],
     })
+    const bonus = await readTournamentBonus(prisma)
 
-    return NextResponse.json({ matches })
+    return NextResponse.json({ ...bonus, matches })
   } catch {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
   }
@@ -163,11 +197,18 @@ export async function PUT(request: Request) {
       )
     }
 
+    await ensureSettingsTable(prisma)
+    await Promise.all([
+      saveSetting(prisma, 'topScorer', typeof state.topScorer === 'string' ? state.topScorer : ''),
+      saveSetting(prisma, 'mvp', typeof state.mvp === 'string' ? state.mvp : ''),
+    ])
+
     const matches = await prisma.match.findMany({
       orderBy: [{ stage: 'asc' }, { date: 'asc' }, { id: 'asc' }],
     })
+    const bonus = await readTournamentBonus(prisma)
 
-    return NextResponse.json({ ok: true, matches })
+    return NextResponse.json({ ok: true, ...bonus, matches })
   } catch (error) {
     console.error('PUT /api/tournament error:', error)
     return NextResponse.json(
