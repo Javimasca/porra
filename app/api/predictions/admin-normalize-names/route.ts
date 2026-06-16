@@ -4,6 +4,16 @@ import { getPrisma } from '../../../../src/lib/prisma'
 
 const fields = new Set(['topScorer', 'mvp'])
 
+function normalizeName(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function isPayload(value: unknown): value is {
   field: 'topScorer' | 'mvp'
   from: string
@@ -77,11 +87,21 @@ export async function POST(request: Request) {
     const data = payload.field === 'topScorer'
       ? { topScorer: payload.to.trim() }
       : { mvp: payload.to.trim() }
-
-    await prisma.prediction.updateMany({
-      where: { [payload.field]: payload.from.trim() },
-      data,
+    const normalizedFrom = normalizeName(payload.from)
+    const matchingPredictions = await prisma.prediction.findMany({
+      where: { [payload.field]: { not: null } },
+      select: { id: true, topScorer: true, mvp: true },
     })
+    const matchingIds = matchingPredictions
+      .filter((prediction) => normalizeName(prediction[payload.field] ?? '') === normalizedFrom)
+      .map((prediction) => prediction.id)
+
+    if (matchingIds.length > 0) {
+      await prisma.prediction.updateMany({
+        where: { id: { in: matchingIds } },
+        data,
+      })
+    }
 
     const predictions = await prisma.prediction.findMany({
       include: { matches: true },
@@ -90,6 +110,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
+      updated: matchingIds.length,
       predictions: predictions.map(serializePrediction),
     })
   } catch (error) {

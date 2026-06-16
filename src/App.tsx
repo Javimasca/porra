@@ -862,6 +862,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     }
 
     setPredictions(saved.predictions.map(normalizePredictionSlip))
+    window.alert(`Nombres normalizados: ${saved.updated} prediccion${saved.updated === 1 ? '' : 'es'}.`)
   }
 
   return (
@@ -4292,7 +4293,7 @@ async function normalizePredictionNames(
   from: string,
   to: string,
   adminPin: string,
-): Promise<{ predictions: PredictionSlip[] } | null> {
+): Promise<{ predictions: PredictionSlip[]; updated: number } | null> {
   try {
     const response = await fetch('/api/predictions/admin-normalize-names', {
       method: 'POST',
@@ -4309,7 +4310,9 @@ async function normalizePredictionNames(
     }
 
     const result = await response.json()
-    return Array.isArray(result.predictions) ? { predictions: result.predictions } : null
+    return Array.isArray(result.predictions)
+      ? { predictions: result.predictions, updated: Number(result.updated ?? 0) }
+      : null
   } catch (error) {
     console.error('No se pudieron normalizar nombres', error)
     return null
