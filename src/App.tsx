@@ -33,6 +33,7 @@ type GroupTeamStanding = TeamStanding & { group: string }
 const participantsStorageKey = 'porra-2026-participants'
 const predictionsStorageKey = 'porra-2026-predictions'
 const tournamentStorageKey = 'porra-2026-tournament'
+const lastAccessCodeStorageKey = 'porra-2026-last-access-code'
 const defaultPredictionPhase: PredictionPhase = 'preGroups'
 const groups = 'ABCDEFGHIJKL'.split('')
 const knockoutStages = ['Ronda de 32', 'Octavos', 'Cuartos', 'Semifinal', 'Final'] as const
@@ -249,6 +250,34 @@ function loadTournamentState() {
   }
 }
 
+function loadLastAccessCode() {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+
+  return localStorage.getItem(lastAccessCodeStorageKey) ?? ''
+}
+
+function rememberAccessCode(accessCode: string) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const trimmedAccessCode = accessCode.trim()
+
+  if (trimmedAccessCode) {
+    localStorage.setItem(lastAccessCodeStorageKey, trimmedAccessCode)
+  }
+}
+
+function forgetAccessCode() {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  localStorage.removeItem(lastAccessCodeStorageKey)
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('Formulario')
   const [mode, setMode] = useState<'publico' | 'admin'>('publico')
@@ -282,7 +311,7 @@ function App() {
   const [publicSubmitSaving, setPublicSubmitSaving] = useState(false)
   const [reopenRequestSubmitting, setReopenRequestSubmitting] = useState(false)
   const [publicForm, setPublicForm] = useState({
-    accessCode: '',
+    accessCode: loadLastAccessCode(),
     name: '',
     contact: '',
     alias: '',
@@ -400,6 +429,7 @@ if (!tournamentResponse.ok) {
     const timeout = window.setTimeout(async () => {
       const participant = await lookupParticipant(accessCode)
       if (!participant) return
+      rememberAccessCode(accessCode)
 
       setParticipants((current) =>
         current.some((item) => item.id === participant.id)
@@ -409,6 +439,12 @@ if (!tournamentResponse.ok) {
     }, 250)
 
     return () => window.clearTimeout(timeout)
+  }, [publicForm.accessCode, publicParticipant])
+
+  useEffect(() => {
+    if (publicParticipant && publicForm.accessCode.trim()) {
+      rememberAccessCode(publicForm.accessCode)
+    }
   }, [publicForm.accessCode, publicParticipant])
 
   useEffect(() => {
@@ -640,6 +676,10 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
   const publicFormRequiredCount = publicFormErrors.length
   const publicGroupFormDisabled = Boolean(publicParticipantPrediction?.locked) || initialPredictionClosed
   const resetPublicForm = (accessCode = '') => {
+    if (!accessCode) {
+      forgetAccessCode()
+    }
+
     setPublicForm({
       accessCode,
       name: '',
@@ -660,6 +700,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
   const loadMyPrediction = async (accessCode: string) => {
     const result = await fetchMyPrediction(accessCode)
     if (!result) return
+    rememberAccessCode(accessCode)
 
     setParticipants((current) =>
       current.some((participant) => participant.id === result.participant.id)
@@ -691,6 +732,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
       window.alert('No se pudo guardar la ronda. Revisa la conexion.')
       return
     }
+    rememberAccessCode(publicForm.accessCode)
 
     setPredictions((current) =>
       current.map((prediction) =>
@@ -733,6 +775,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
       window.alert(saved.error)
       return
     }
+    rememberAccessCode(publicForm.accessCode)
 
     const nextPrediction = {
       ...normalizePredictionSlip(saved.prediction),
@@ -1146,6 +1189,7 @@ type="button"
                         <button
                           className="secondary-action"
                           onClick={() => {
+                            forgetAccessCode()
                             setPublicForm({
                               accessCode: '',
                               name: '',
@@ -1410,6 +1454,7 @@ type="button"
                       <button
                         className="secondary-action"
                         onClick={() => {
+                          forgetAccessCode()
                           setPublicForm({
                             accessCode: '',
                             name: '',
@@ -1522,6 +1567,7 @@ type="button"
                         <button
                           className="secondary-action"
                           onClick={() => {
+                            forgetAccessCode()
                             setPublicForm({
                               accessCode: '',
                               name: '',
