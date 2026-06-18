@@ -296,6 +296,8 @@ function App() {
   const [selectedPublicPredictionParticipantId, setSelectedPublicPredictionParticipantId] = useState('')
   const [expandedLeaderboardParticipantId, setExpandedLeaderboardParticipantId] = useState<string | null>(null)
   const [selectedPublicPredictionScope, setSelectedPublicPredictionScope] = useState('all')
+  const [publicPredictionView, setPublicPredictionView] = useState<'participant' | 'match'>('participant')
+  const [selectedPublicMatchId, setSelectedPublicMatchId] = useState('')
   const [selectedKnockoutParticipantId, setSelectedKnockoutParticipantId] = useState('')
   const [activeKnockoutStage, setActiveKnockoutStage] = useState<(typeof knockoutStages)[number]>('Ronda de 32')
   const [matchPredictions, setMatchPredictions] = useState<Record<string, MatchPrediction>>({})
@@ -589,6 +591,17 @@ if (!tournamentResponse.ok) {
     : closedPredictionStages.includes(selectedPublicPredictionScope as Match['stage'])
       ? [selectedPublicPredictionScope as Match['stage']]
       : []
+  const visiblePublicMatches = resolvedTournamentState.matches.filter((match) => {
+    if (!closedPredictionStages.includes(match.stage)) return false
+
+    if (selectedPublicPredictionScope === 'all') return true
+    if (selectedPublicPredictionScope.startsWith('group-')) {
+      return match.stage === 'Grupo' && match.group === selectedPublicPredictionScope.replace('group-', '')
+    }
+
+    return match.stage === selectedPublicPredictionScope
+  })
+  const selectedPublicMatch = visiblePublicMatches.find((match) => match.id === selectedPublicMatchId) ?? visiblePublicMatches[0]
   const scoringDetailsByParticipant = useMemo(
     () => Object.fromEntries(
       [...predictions, ...publicPredictions].map((prediction) => [
@@ -621,6 +634,18 @@ if (!tournamentResponse.ok) {
       })
     }
   }, [publicParticipantPrediction, publicVisiblePredictions, selectedPublicPredictionParticipantId])
+  useEffect(() => {
+    if (!visiblePublicMatches.length) {
+      if (selectedPublicMatchId) {
+        queueMicrotask(() => setSelectedPublicMatchId(''))
+      }
+      return
+    }
+
+    if (!visiblePublicMatches.some((match) => match.id === selectedPublicMatchId)) {
+      queueMicrotask(() => setSelectedPublicMatchId(visiblePublicMatches[0].id))
+    }
+  }, [selectedPublicMatchId, visiblePublicMatches])
   const selectedPrediction = predictions.find(
     (prediction) => prediction.participantId === selectedPredictionParticipantId,
   )
@@ -1740,6 +1765,16 @@ type="button"
               <div className="prediction-public-list">
                 <div className="prediction-toolbar">
                   <label>
+                    Vista
+                    <select
+                      onChange={(event) => setPublicPredictionView(event.target.value as 'participant' | 'match')}
+                      value={publicPredictionView}
+                    >
+                      <option value="participant">Por participante</option>
+                      <option value="match">Por partido</option>
+                    </select>
+                  </label>
+                  <label>
                     Participante
                     <select
                       onChange={(event) => setSelectedPublicPredictionParticipantId(event.target.value)}
@@ -1773,15 +1808,30 @@ type="button"
                         ))}
                     </select>
                   </label>
+                  {publicPredictionView === 'match' && (
+                    <label>
+                      Partido
+                      <select
+                        onChange={(event) => setSelectedPublicMatchId(event.target.value)}
+                        value={selectedPublicMatch?.id ?? ''}
+                      >
+                        {visiblePublicMatches.map((match) => (
+                          <option key={match.id} value={match.id}>
+                            {formatDate(match.date)} · {teamLabel(match.home)} - {teamLabel(match.away)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                 </div>
 
-                {!selectedPublicPredictionParticipantId && (
+                {publicPredictionView === 'participant' && !selectedPublicPredictionParticipantId && (
                   <div className="panel">
                     <p>Selecciona un participante para ver su pronostico.</p>
                   </div>
                 )}
 
-                {selectedPublicPredictionParticipantId && filteredPublicPredictions.length === 0 && (
+                {publicPredictionView === 'participant' && selectedPublicPredictionParticipantId && filteredPublicPredictions.length === 0 && (
                   <div className="panel">
                     <p>
                       No hay pronosticos visibles para este filtro. Comprueba que la fase este cerrada y que existan
@@ -1790,7 +1840,22 @@ type="button"
                   </div>
                 )}
 
-                {filteredPublicPredictions.map((prediction) => {
+                {publicPredictionView === 'match' && selectedPublicMatch && (
+                  <PublicMatchPredictionsTable
+                    match={selectedPublicMatch}
+                    participants={participants}
+                    predictions={publicVisiblePredictionsByName}
+                    scoringDetailsByParticipant={scoringDetailsByParticipant}
+                  />
+                )}
+
+                {publicPredictionView === 'match' && !selectedPublicMatch && (
+                  <div className="panel">
+                    <p>No hay partidos visibles para este filtro.</p>
+                  </div>
+                )}
+
+                {publicPredictionView === 'participant' && filteredPublicPredictions.map((prediction) => {
                     const participant = participants.find((item) => item.id === prediction.participantId)
                     const visibleMatches = prediction.matches.filter((pick) => {
                       const match = resolvedTournamentState.matches.find((item) => item.id === pick.matchId)
@@ -3576,6 +3641,68 @@ function NameVariantList({
           </div>
         ))
       )}
+    </div>
+  )
+}
+
+function PublicMatchPredictionsTable({
+  match,
+  participants,
+  predictions,
+  scoringDetailsByParticipant,
+}: {
+  match: Match
+  participants: Participant[]
+  predictions: PredictionSlip[]
+  scoringDetailsByParticipant: Record<string, ReturnType<typeof scorePredictionDetails>>
+}) {
+  const rows = predictions
+    .map((prediction) => {
+      const participant = participants.find((item) => item.id === prediction.participantId)
+      const pick = prediction.matches.find((item) => item.matchId === match.id)
+
+      return {
+        participantName: participant?.name ?? 'Participante',
+        pick,
+        points: scoringDetailsByParticipant[prediction.participantId]?.matches[match.id],
+      }
+    })
+    .filter((row) => row.pick)
+    .sort((a, b) => a.participantName.localeCompare(b.participantName))
+
+  return (
+    <div className="table-wrap public-match-table">
+      <div className="panel-title">
+        <h3>{teamLabel(match.home)} - {teamLabel(match.away)}</h3>
+        <span>{rows.length} pronosticos</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Participante</th>
+            <th>Pronostico</th>
+            <th>Puntos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={3}>No hay pronosticos visibles para este partido.</td>
+            </tr>
+          ) : rows.map((row) => (
+            <tr key={`${match.id}-${row.participantName}`}>
+              <td>{row.participantName}</td>
+              <td>
+                <strong>{row.pick?.homeScore}</strong>
+                {' - '}
+                <strong>{row.pick?.awayScore}</strong>
+                {row.pick?.penaltyWinner && <span> · pen. {teamLabel(row.pick.penaltyWinner)}</span>}
+              </td>
+              <td>{row.points === undefined ? '-' : row.points}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
