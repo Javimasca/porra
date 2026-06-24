@@ -770,21 +770,24 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
   }
 
   const savePublicKnockoutFinal = async () => {
+    if (!publicParticipantPrediction) return
+
     const filledPredictions = Object.values(publicKnockoutPredictions).filter(
       (prediction) => Number.isFinite(prediction.homeScore) && Number.isFinite(prediction.awayScore),
     )
 
+    const basePrediction = publicParticipantPrediction
     const payload = {
       accessCode: publicForm.accessCode,
       matches: filledPredictions,
       locked: true,
-      champion: publicForm.champion,
-      semifinalists: publicForm.semifinalists,
-      topScorer: publicForm.topScorer,
-      mvp: publicForm.mvp,
-      groupWinners: publicForm.groupWinners,
-      groupQualified: publicForm.groupQualified,
-      bestThirds: publicForm.bestThirds,
+      champion: basePrediction.champion,
+      semifinalists: basePrediction.semifinalists,
+      topScorer: basePrediction.topScorer,
+      mvp: basePrediction.mvp,
+      groupWinners: basePrediction.groupWinners,
+      groupQualified: basePrediction.groupQualified,
+      bestThirds: basePrediction.bestThirds,
     }
 
     const saved = await submitPublicKnockoutPredictions(payload)
@@ -804,8 +807,13 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     // If prediction is now locked, generate PDF including groups/bonus/up-to-date matches
     if (saved.prediction.locked) {
       const participant = participants.find((p) => p.accessCode === publicForm.accessCode) ?? { id: '', name: '' }
+      const printablePrediction = normalizePredictionSlip(saved.prediction)
       try {
-        generatePredictionPdf({ participant, prediction: normalizePredictionSlip(saved.prediction), matches: getPrintableMatches(tournamentState.matches) })
+        generatePredictionPdf({
+          participant,
+          prediction: printablePrediction,
+          matches: getPrintableMatches(tournamentState.matches, printablePrediction),
+        })
       } catch (error) {
         console.error('No se pudo descargar el PDF automaticamente', error)
       }
@@ -873,7 +881,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
         generatePredictionPdf({
             participant: { ...publicParticipant, name: displayName },
             prediction: confirmedPrediction,
-            matches: getPrintableMatches(tournamentState.matches),
+            matches: getPrintableMatches(tournamentState.matches, confirmedPrediction),
           })
       } catch (error) {
         console.error('No se pudo descargar el PDF automaticamente', error)
@@ -1177,7 +1185,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
               generatePredictionPdf({
               participant: publicParticipant,
               prediction: publicParticipantPrediction,
-              matches: getPrintableMatches(tournamentState.matches),
+              matches: getPrintableMatches(tournamentState.matches, publicParticipantPrediction),
             })
           }}
           type="button"
@@ -1597,7 +1605,7 @@ type="button"
                               generatePredictionPdf({
                               participant: publicParticipant,
                               prediction: publicParticipantPrediction,
-                              matches: getPrintableMatches(tournamentState.matches),
+                              matches: getPrintableMatches(tournamentState.matches, publicParticipantPrediction),
                             })
                             }}
                             type="button"
@@ -2633,7 +2641,7 @@ type="button"
                     generatePredictionPdf({
                       participant,
                       prediction: selectedPrediction,
-                      matches: getPrintableMatches(tournamentState.matches),
+                      matches: getPrintableMatches(tournamentState.matches, selectedPrediction),
                     })
                   }}
                   type="button"
@@ -3583,7 +3591,7 @@ function PredictionReview({
       generatePredictionPdf({
           participant,
           prediction,
-          matches: getPrintableMatches(tournamentState.matches),
+          matches: getPrintableMatches(tournamentState.matches, prediction),
         })
     }
     type="button"
@@ -4240,10 +4248,12 @@ doc.text('Predicciones finales', 14, 85)
   doc.save(fileName)
 }
 
-function getPrintableMatches(allMatches: Match[]) {
+function getPrintableMatches(allMatches: Match[], prediction?: PredictionSlip) {
   const now = new Date()
+  const predictedMatchIds = new Set(prediction?.matches.map((match) => match.matchId) ?? [])
+
   return allMatches.filter((m) =>
-    m.stage === 'Grupo' || m.stage === 'Bonus' || (m.date && new Date(m.date) <= now),
+    m.stage === 'Grupo' || m.stage === 'Bonus' || predictedMatchIds.has(m.id) || (m.date && new Date(m.date) <= now),
   )
 }
 
