@@ -753,8 +753,8 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     )
     const saved = await submitPublicKnockoutPredictions({ accessCode: publicForm.accessCode, matches: filledPredictions })
 
-    if (!saved?.prediction) {
-      window.alert('No se pudo guardar la ronda. Revisa la conexion.')
+    if (!saved.ok || !saved.prediction) {
+      window.alert(saved.error)
       return
     }
     rememberAccessCode(publicForm.accessCode)
@@ -788,8 +788,8 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     }
 
     const saved = await submitPublicKnockoutPredictions(payload)
-    if (!saved?.prediction) {
-      window.alert('No se pudo marcar como definitiva. Revisa la conexión.')
+    if (!saved.ok || !saved.prediction) {
+      window.alert(saved.error)
       return
     }
 
@@ -4495,7 +4495,7 @@ async function submitPublicPrediction(body: {
 
 async function submitPublicKnockoutPredictions(
   payload: unknown,
-): Promise<{ prediction: PredictionSlip | null } | null> {
+): Promise<{ ok: true; prediction: PredictionSlip | null } | { ok: false; error: string }> {
   try {
     const response = await fetch('/api/predictions/knockout', {
       method: 'POST',
@@ -4505,13 +4505,14 @@ async function submitPublicKnockoutPredictions(
 
     if (!response.ok) {
       const text = await response.text()
-      throw new Error(`HTTP ${response.status}: ${text}`)
+      return { ok: false, error: `No se pudo guardar la ronda. HTTP ${response.status}: ${text}` }
     }
 
-    return response.json()
+    const result = await response.json()
+    return { ok: true, prediction: result.prediction }
   } catch (error) {
     console.error('No se pudieron guardar las eliminatorias publicas', error)
-    return null
+    return { ok: false, error: 'No se pudo conectar con el servidor para guardar la ronda.' }
   }
 }
 

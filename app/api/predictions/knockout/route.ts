@@ -64,11 +64,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Prediction not found' }, { status: 404 })
     }
 
-    // If prediction already locked, do not allow public edits (same behaviour as group submit)
-    if (existingPrediction.locked) {
-      return NextResponse.json({ error: 'Prediction is locked' }, { status: 409 })
-    }
-
     // Determine verification code if locking now
     const willLock = Boolean(body.locked)
     const verificationCode = willLock && !existingPrediction.verificationCode
