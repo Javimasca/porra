@@ -751,7 +751,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     const filledPredictions = Object.values(publicKnockoutPredictions).filter(
       (prediction) => Number.isFinite(prediction.homeScore) && Number.isFinite(prediction.awayScore),
     )
-    const saved = await submitPublicKnockoutPredictions(publicForm.accessCode, filledPredictions)
+    const saved = await submitPublicKnockoutPredictions({ accessCode: publicForm.accessCode, matches: filledPredictions })
 
     if (!saved?.prediction) {
       window.alert('No se pudo guardar la ronda. Revisa la conexion.')
@@ -767,6 +767,51 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
       ),
     )
     window.alert('Ronda guardada.')
+  }
+
+  const savePublicKnockoutFinal = async () => {
+    const filledPredictions = Object.values(publicKnockoutPredictions).filter(
+      (prediction) => Number.isFinite(prediction.homeScore) && Number.isFinite(prediction.awayScore),
+    )
+
+    const payload = {
+      accessCode: publicForm.accessCode,
+      matches: filledPredictions,
+      locked: true,
+      champion: publicForm.champion,
+      semifinalists: publicForm.semifinalists,
+      topScorer: publicForm.topScorer,
+      mvp: publicForm.mvp,
+      groupWinners: publicForm.groupWinners,
+      groupQualified: publicForm.groupQualified,
+      bestThirds: publicForm.bestThirds,
+    }
+
+    const saved = await submitPublicKnockoutPredictions(payload)
+    if (!saved?.prediction) {
+      window.alert('No se pudo marcar como definitiva. Revisa la conexión.')
+      return
+    }
+
+    rememberAccessCode(publicForm.accessCode)
+
+    setPredictions((current) =>
+      current.map((prediction) =>
+        prediction.participantId === saved.prediction.participantId ? normalizePredictionSlip(saved.prediction) : prediction,
+      ),
+    )
+
+    // If prediction is now locked, generate PDF including groups/bonus/up-to-date matches
+    if (saved.prediction.locked) {
+      const participant = participants.find((p) => p.accessCode === publicForm.accessCode) ?? { id: '', name: '' }
+      try {
+        generatePredictionPdf({ participant, prediction: normalizePredictionSlip(saved.prediction), matches: getPrintableMatches(tournamentState.matches) })
+      } catch (error) {
+        console.error('No se pudo descargar el PDF automaticamente', error)
+      }
+    }
+
+    window.alert('Predicción marcada como definitiva.')
   }
   const savePublicPrediction = async (locked: boolean) => {
     if (!publicParticipant) return
@@ -826,10 +871,10 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     if (locked) {
       try {
         generatePredictionPdf({
-          participant: { ...publicParticipant, name: displayName },
-          prediction: confirmedPrediction,
-          matches: tournamentState.matches.filter((match) => match.stage === 'Grupo'),
-        })
+            participant: { ...publicParticipant, name: displayName },
+            prediction: confirmedPrediction,
+            matches: getPrintableMatches(tournamentState.matches),
+          })
       } catch (error) {
         console.error('No se pudo descargar el PDF automaticamente', error)
       }
@@ -1129,10 +1174,10 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
         <button
           className="primary-action"
           onClick={() => {
-            generatePredictionPdf({
+              generatePredictionPdf({
               participant: publicParticipant,
               prediction: publicParticipantPrediction,
-              matches: tournamentState.matches.filter((match) => match.stage === 'Grupo'),
+              matches: getPrintableMatches(tournamentState.matches),
             })
           }}
           type="button"
@@ -1550,10 +1595,10 @@ type="button"
                             className="primary-action"
                             onClick={() => {
                               generatePredictionPdf({
-                                participant: publicParticipant,
-                                prediction: publicParticipantPrediction,
-                                matches: tournamentState.matches.filter((match) => match.stage === 'Grupo'),
-                              })
+                              participant: publicParticipant,
+                              prediction: publicParticipantPrediction,
+                              matches: getPrintableMatches(tournamentState.matches),
+                            })
                             }}
                             type="button"
                           >
@@ -1664,6 +1709,9 @@ type="button"
                         </div>
                         <button className="primary-action" onClick={savePublicKnockoutPredictions} type="button">
                           Guardar ronda
+                        </button>
+                        <button className="secondary-action" onClick={savePublicKnockoutFinal} type="button">
+                          Marcar definitiva
                         </button>
                       </div>
                     )}
@@ -2585,7 +2633,7 @@ type="button"
                     generatePredictionPdf({
                       participant,
                       prediction: selectedPrediction,
-                      matches: tournamentState.matches.filter((match) => match.stage === 'Grupo'),
+                      matches: getPrintableMatches(tournamentState.matches),
                     })
                   }}
                   type="button"
@@ -3533,10 +3581,10 @@ function PredictionReview({
     className="small-action"
     onClick={() =>
       generatePredictionPdf({
-        participant,
-        prediction,
-        matches: tournamentState.matches.filter((match) => match.stage === 'Grupo'),
-      })
+          participant,
+          prediction,
+          matches: getPrintableMatches(tournamentState.matches),
+        })
     }
     type="button"
   >
@@ -4192,6 +4240,13 @@ doc.text('Predicciones finales', 14, 85)
   doc.save(fileName)
 }
 
+function getPrintableMatches(allMatches: Match[]) {
+  const now = new Date()
+  return allMatches.filter((m) =>
+    m.stage === 'Grupo' || m.stage === 'Bonus' || (m.date && new Date(m.date) <= now),
+  )
+}
+
 async function syncApi(path: string, body: unknown, adminPin?: string) {
   try {
     const response = await fetch(path, {
@@ -4439,14 +4494,13 @@ async function submitPublicPrediction(body: {
 }
 
 async function submitPublicKnockoutPredictions(
-  accessCode: string,
-  matches: MatchPrediction[],
+  payload: unknown,
 ): Promise<{ prediction: PredictionSlip | null } | null> {
   try {
     const response = await fetch('/api/predictions/knockout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accessCode, matches }),
+      body: JSON.stringify(payload),
     })
 
     if (!response.ok) {
