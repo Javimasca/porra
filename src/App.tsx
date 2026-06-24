@@ -813,6 +813,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
           participant,
           prediction: printablePrediction,
           matches: getPrintableMatches(tournamentState.matches, printablePrediction),
+          tournamentState,
         })
       } catch (error) {
         console.error('No se pudo descargar el PDF automaticamente', error)
@@ -882,6 +883,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
             participant: { ...publicParticipant, name: displayName },
             prediction: confirmedPrediction,
             matches: getPrintableMatches(tournamentState.matches, confirmedPrediction),
+            tournamentState,
           })
       } catch (error) {
         console.error('No se pudo descargar el PDF automaticamente', error)
@@ -1186,6 +1188,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
               participant: publicParticipant,
               prediction: publicParticipantPrediction,
               matches: getPrintableMatches(tournamentState.matches, publicParticipantPrediction),
+              tournamentState,
             })
           }}
           type="button"
@@ -1606,6 +1609,7 @@ type="button"
                               participant: publicParticipant,
                               prediction: publicParticipantPrediction,
                               matches: getPrintableMatches(tournamentState.matches, publicParticipantPrediction),
+                              tournamentState,
                             })
                             }}
                             type="button"
@@ -2642,6 +2646,7 @@ type="button"
                       participant,
                       prediction: selectedPrediction,
                       matches: getPrintableMatches(tournamentState.matches, selectedPrediction),
+                      tournamentState,
                     })
                   }}
                   type="button"
@@ -3592,6 +3597,7 @@ function PredictionReview({
           participant,
           prediction,
           matches: getPrintableMatches(tournamentState.matches, prediction),
+          tournamentState,
         })
     }
     type="button"
@@ -4146,14 +4152,18 @@ function generatePredictionPdf({
   participant,
   prediction,
   matches,
+  tournamentState,
 }: {
   participant: Participant
   prediction: PredictionSlip
   matches: Match[]
+  tournamentState: TournamentState
 }) {
   const doc = new jsPDF()
   const autoTableDoc = doc as AutoTableDocument
 
+  // Build qualification data to resolve knockout slots
+  const qualification = buildQualification(tournamentState.matches)
 
 doc.setFontSize(20)
 doc.text('Porra Mundial 2026', 14, 20)
@@ -4210,18 +4220,41 @@ doc.text('Predicciones finales', 14, 85)
       (item) => item.matchId === match.id,
     )
 
+    // Resolve knockout team names from qualification data
+    let homeTeam = match.home
+    let awayTeam = match.away
+    
+    if (match.stage !== 'Grupo' && match.stage !== 'Bonus') {
+      const resolvedHome = resolveKnockoutSlot(match.home, qualification)
+      const resolvedAway = resolveKnockoutSlot(match.away, qualification)
+      homeTeam = resolvedHome || match.home
+      awayTeam = resolvedAway || match.away
+    }
+
+    let scoreDisplay = `${predictionMatch?.homeScore ?? '-'} - ${predictionMatch?.awayScore ?? '-'}`
+    
+    // Add penalty winner info if applicable
+    if (
+      predictionMatch &&
+      Number.isFinite(predictionMatch.homeScore) &&
+      Number.isFinite(predictionMatch.awayScore) &&
+      predictionMatch.homeScore === predictionMatch.awayScore &&
+      predictionMatch.penaltyWinner
+    ) {
+      scoreDisplay += ` (${predictionMatch.penaltyWinner})`
+    }
+
     return [
       match.group || match.stage,
-      match.home,
-      predictionMatch?.homeScore ?? '-',
-      predictionMatch?.awayScore ?? '-',
-      match.away,
+      homeTeam,
+      scoreDisplay,
+      awayTeam,
     ]
   })
 
   autoTable(doc, {
     startY: (autoTableDoc.lastAutoTable?.finalY ?? 72) + 12,
-    head: [['Grupo', 'Local', 'GL', 'GV', 'Visitante']],
+    head: [['Etapa', 'Local', 'Resultado', 'Visitante']],
     body: tableRows,
     styles: {
       fontSize: 8,
