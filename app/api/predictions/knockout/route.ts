@@ -71,36 +71,6 @@ export async function POST(request: Request) {
       ? `PORRA-2026-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
       : existingPrediction.verificationCode
 
-    // Upsert prediction metadata (keep existing values when not provided)
-    const savedPrediction = await prisma.prediction.upsert({
-      where: { participantId: participant.id },
-      update: {
-        locked: true,
-        reopenRequested: false,
-        champion: typeof body.champion === 'string' ? body.champion : existingPrediction.champion,
-        semifinalists: body.semifinalists ?? existingPrediction.semifinalists,
-        topScorer: typeof body.topScorer === 'string' ? body.topScorer : existingPrediction.topScorer,
-        mvp: typeof body.mvp === 'string' ? body.mvp : existingPrediction.mvp,
-        groupWinners: body.groupWinners ?? existingPrediction.groupWinners,
-        groupQualified: body.groupQualified ?? existingPrediction.groupQualified,
-        bestThirds: body.bestThirds ?? existingPrediction.bestThirds,
-        verificationCode,
-      },
-      create: {
-        participantId: participant.id,
-        locked: true,
-        reopenRequested: false,
-        champion: body.champion ?? null,
-        semifinalists: body.semifinalists ?? [],
-        topScorer: body.topScorer ?? null,
-        mvp: body.mvp ?? null,
-        groupWinners: body.groupWinners ?? {},
-        groupQualified: body.groupQualified ?? {},
-        bestThirds: body.bestThirds ?? [],
-        verificationCode: willLock ? verificationCode : null,
-      },
-    })
-
     const stageMatches = await prisma.match.findMany({
       where: { stage: phase },
       select: { id: true },
@@ -109,6 +79,35 @@ export async function POST(request: Request) {
     const stagePredictions = matches.filter((match) => stageMatchIds.has(match.matchId))
 
     await prisma.$transaction(async (tx) => {
+      const savedPrediction = await tx.prediction.upsert({
+        where: { participantId: participant.id },
+        update: {
+          locked: true,
+          reopenRequested: false,
+          champion: typeof body.champion === 'string' ? body.champion : existingPrediction.champion,
+          semifinalists: body.semifinalists ?? existingPrediction.semifinalists,
+          topScorer: typeof body.topScorer === 'string' ? body.topScorer : existingPrediction.topScorer,
+          mvp: typeof body.mvp === 'string' ? body.mvp : existingPrediction.mvp,
+          groupWinners: body.groupWinners ?? existingPrediction.groupWinners,
+          groupQualified: body.groupQualified ?? existingPrediction.groupQualified,
+          bestThirds: body.bestThirds ?? existingPrediction.bestThirds,
+          verificationCode,
+        },
+        create: {
+          participantId: participant.id,
+          locked: true,
+          reopenRequested: false,
+          champion: body.champion ?? null,
+          semifinalists: body.semifinalists ?? [],
+          topScorer: body.topScorer ?? null,
+          mvp: body.mvp ?? null,
+          groupWinners: body.groupWinners ?? {},
+          groupQualified: body.groupQualified ?? {},
+          bestThirds: body.bestThirds ?? [],
+          verificationCode,
+        },
+      })
+
       await tx.matchPrediction.deleteMany({
         where: {
           predictionId: savedPrediction.id,
@@ -123,7 +122,7 @@ export async function POST(request: Request) {
             matchId: match.matchId,
             homeScore: match.homeScore,
             awayScore: match.awayScore,
-            penaltyWinner: match.penaltyWinner,
+            penaltyWinner: match.penaltyWinner || null,
           })),
         })
       }
