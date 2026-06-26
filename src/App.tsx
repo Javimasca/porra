@@ -2076,12 +2076,12 @@ type="button"
                     setTournamentState(nextState)
                     const saved = await syncApi('/api/tournament', nextState, adminPinInput)
                     if (!saved) {
-                      window.alert('No se pudieron guardar los cruces de ronda de 32.')
+                      window.alert('No se pudieron guardar los cruces de dieciseisavos.')
                     }
                   }}
                   type="button"
                 >
-                  Aplicar cruces R32
+                  Aplicar cruces dieciseisavos
                 </button>
                 <button className="primary-action" type="button">Recalcular puntos</button>
               </div>
@@ -2130,7 +2130,7 @@ type="button"
                   <li>Validar pagos pendientes.</li>
                   <li>Cerrar pronosticos de grupos antes del inicio.</li>
                   <li>Introducir marcadores oficiales tras cada partido.</li>
-                  <li>Abrir ronda de 32 cuando FIFA publique cruces.</li>
+                  <li>Abrir dieciseisavos cuando FIFA publique cruces.</li>
                 </ul>
               </div>
             </section>
@@ -3368,7 +3368,7 @@ setMatchPredictions((current) => {
                   </thead>
                   <tbody>
                     <tr>
-                      <td>Ronda de 32: 16 / 15 / 14 / 13 / 12 / 11 / 10 signos</td>
+                      <td>Dieciseisavos: 16 / 15 / 14 / 13 / 12 / 11 / 10 signos</td>
                       <td>24 / 22 / 20 / 18 / 16 / 14 / 12</td>
                     </tr>
                     <tr>
