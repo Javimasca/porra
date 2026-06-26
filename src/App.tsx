@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import './App.css'
@@ -322,6 +322,7 @@ function App() {
   const [matchPredictions, setMatchPredictions] = useState<Record<string, MatchPrediction>>({})
   const [knockoutPredictions, setKnockoutPredictions] = useState<Record<string, MatchPrediction>>({})
   const [publicKnockoutPredictions, setPublicKnockoutPredictions] = useState<Record<string, MatchPrediction>>({})
+  const publicKnockoutHydrationKeyRef = useRef('')
   const [publicFormStep, setPublicFormStep] = useState<'code-input' | 'form' | 'confirmation'>('code-input')
   const [publicFormConfirmation, setPublicFormConfirmation] = useState<{
     participantName: string
@@ -687,6 +688,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     let cancelled = false
 
     if (!publicParticipantPrediction || !currentKnockoutStage) {
+      publicKnockoutHydrationKeyRef.current = ''
       queueMicrotask(() => {
         if (!cancelled) {
           setPublicKnockoutPredictions({})
@@ -694,6 +696,12 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
       })
       return
     }
+
+    const hydrationKey = `${publicParticipantPrediction.participantId}:${currentKnockoutStage}`
+    if (publicKnockoutHydrationKeyRef.current === hydrationKey) {
+      return
+    }
+    publicKnockoutHydrationKeyRef.current = hydrationKey
 
     const nextPredictions = Object.fromEntries(
       publicParticipantPrediction.matches
