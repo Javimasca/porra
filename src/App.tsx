@@ -232,6 +232,21 @@ function normalizeMatch(match: Match): Match {
   }
 }
 
+function mergeStageMatchPredictions(
+  existingMatches: MatchPrediction[],
+  nextStageMatches: MatchPrediction[],
+  matches: Match[],
+  stage: string,
+) {
+  const stageMatchIds = new Set(matches.filter((match) => match.stage === stage).map((match) => match.id))
+  const nextByMatchId = new Map(nextStageMatches.map((prediction) => [prediction.matchId, prediction]))
+
+  return [
+    ...existingMatches.filter((prediction) => !stageMatchIds.has(prediction.matchId)),
+    ...Array.from(nextByMatchId.values()),
+  ]
+}
+
 function loadTournamentState() {
   if (typeof window === 'undefined') {
     return initialTournamentState
@@ -749,6 +764,8 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     }
   }
   const savePublicKnockoutPredictions = async () => {
+    if (!currentKnockoutStage) return
+
     const filledPredictions = Object.values(publicKnockoutPredictions).filter(
       (prediction) => Number.isFinite(prediction.homeScore) && Number.isFinite(prediction.awayScore),
     )
@@ -760,10 +777,19 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
     }
     rememberAccessCode(publicForm.accessCode)
 
+    const savedPrediction = normalizePredictionSlip(saved.prediction)
     setPredictions((current) =>
       current.map((prediction) =>
-        prediction.participantId === saved.prediction.participantId
-          ? normalizePredictionSlip(saved.prediction)
+        prediction.participantId === savedPrediction.participantId
+          ? {
+              ...savedPrediction,
+              matches: mergeStageMatchPredictions(
+                prediction.matches,
+                savedPrediction.matches,
+                tournamentState.matches,
+                currentKnockoutStage,
+              ),
+            }
           : prediction,
       ),
     )
@@ -2887,41 +2913,59 @@ setMatchPredictions((current) => {
               <button
   className="primary-action"
   disabled={!selectedKnockoutParticipantId || !knockoutEditingEnabled}
-                onClick={() => {
+                onClick={async () => {
                   const filledKnockoutPredictions = Object.values(knockoutPredictions).filter(
                     (prediction) =>
                       Number.isFinite(prediction.homeScore) && Number.isFinite(prediction.awayScore),
                   )
 
-                  setPredictions((current) => {
-                    const existing = current.find(
-                      (prediction) => prediction.participantId === selectedKnockoutParticipantId,
-                    )
-                    const groupPredictions = existing?.matches.filter((prediction) => {
-    const match = resolvedTournamentState.matches.find((item) => item.id === prediction.matchId)
-                      return match?.stage === 'Grupo'
-                    }) ?? []
+                    const participant = participants.find((item) => item.id === selectedKnockoutParticipantId)
+                    if (!participant) return
+
+                    const editableStage = currentKnockoutStage ?? activeKnockoutStage
                     const editableStagePredictions = filledKnockoutPredictions.filter((prediction) => {
                       const match = tournamentState.matches.find(
                         (item) => item.id === prediction.matchId,
                       )
 
-                      return match?.stage === (currentKnockoutStage ?? activeKnockoutStage)
+                      return match?.stage === editableStage
                     })
-                    const nextPrediction: PredictionSlip = {
-                      participantId: selectedKnockoutParticipantId,
-                      locked: existing?.locked ?? true,
-                      reopenRequested: existing?.reopenRequested ?? false,
-                      submittedAt: existing?.submittedAt,
-                      champion: existing?.champion ?? '',
-                      semifinalists: existing?.semifinalists ?? [],
-                      topScorer: existing?.topScorer ?? '',
-                      mvp: existing?.mvp ?? '',
-                      groupWinners: existing?.groupWinners ?? {},
-                      groupQualified: existing?.groupQualified ?? {},
-                      bestThirds: existing?.bestThirds ?? [],
-                      matches: [...groupPredictions, ...editableStagePredictions],
+
+                    const saved = await submitPublicKnockoutPredictions({
+                      accessCode: participant.accessCode,
+                      matches: editableStagePredictions,
+                    })
+
+                    if (!saved.ok || !saved.prediction) {
+                      window.alert(saved.error)
+                      return
                     }
+
+                    setPredictions((current) => {
+                      const existing = current.find(
+                        (prediction) => prediction.participantId === selectedKnockoutParticipantId,
+                      )
+                      const savedPrediction = normalizePredictionSlip(saved.prediction)
+                      const nextPrediction: PredictionSlip = {
+                        participantId: selectedKnockoutParticipantId,
+                        locked: savedPrediction.locked,
+                        reopenRequested: savedPrediction.reopenRequested,
+                        submittedAt: existing?.submittedAt,
+                        verificationCode: savedPrediction.verificationCode,
+                        champion: savedPrediction.champion,
+                        semifinalists: savedPrediction.semifinalists,
+                        topScorer: savedPrediction.topScorer,
+                        mvp: savedPrediction.mvp,
+                        groupWinners: savedPrediction.groupWinners,
+                        groupQualified: savedPrediction.groupQualified,
+                        bestThirds: savedPrediction.bestThirds,
+                        matches: mergeStageMatchPredictions(
+                          existing?.matches ?? [],
+                          savedPrediction.matches,
+                          tournamentState.matches,
+                          editableStage,
+                        ),
+                      }
 
                     return existing
                       ? current.map((prediction) =>
@@ -2929,6 +2973,7 @@ setMatchPredictions((current) => {
                         )
                       : [...current, nextPrediction]
                   })
+                    window.alert('Ronda guardada.')
                 }}
                 type="button"
               >
@@ -3585,10 +3630,6 @@ function PredictionReview({
   prediction?: PredictionSlip
   tournamentState: TournamentState
 }) {
-  if (!participant) {
-    return null
-  }
-
   const qualification = useMemo(
     () => buildQualification(tournamentState.matches),
     [tournamentState.matches],
@@ -3610,6 +3651,10 @@ function PredictionReview({
   const completedMatches = prediction?.matches.filter(
     (match) => Number.isFinite(match.homeScore) && Number.isFinite(match.awayScore),
   ).length ?? 0
+
+  if (!participant) {
+    return null
+  }
 
   return (
     <section className="review-panel">
