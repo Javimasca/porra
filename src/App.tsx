@@ -797,6 +797,23 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
           : prediction,
       ),
     )
+    setPublicPredictions((current) =>
+      current.some((prediction) => prediction.participantId === savedPrediction.participantId)
+        ? current.map((prediction) =>
+            prediction.participantId === savedPrediction.participantId
+              ? {
+                  ...savedPrediction,
+                  matches: mergeStageMatchPredictions(
+                    prediction.matches,
+                    savedPrediction.matches,
+                    tournamentState.matches,
+                    currentKnockoutStage,
+                  ),
+                }
+              : prediction,
+          )
+        : [...current, savedPrediction],
+    )
     window.alert('Ronda guardada.')
   }
 
@@ -829,21 +846,28 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
 
     rememberAccessCode(publicForm.accessCode)
 
+    const savedPrediction = normalizePredictionSlip(saved.prediction)
     setPredictions((current) =>
       current.map((prediction) =>
-        prediction.participantId === saved.prediction.participantId ? normalizePredictionSlip(saved.prediction) : prediction,
+        prediction.participantId === savedPrediction.participantId ? savedPrediction : prediction,
       ),
+    )
+    setPublicPredictions((current) =>
+      current.some((prediction) => prediction.participantId === savedPrediction.participantId)
+        ? current.map((prediction) =>
+            prediction.participantId === savedPrediction.participantId ? savedPrediction : prediction,
+          )
+        : [...current, savedPrediction],
     )
 
     // If prediction is now locked, generate PDF including groups/bonus/up-to-date matches
-    if (saved.prediction.locked) {
+    if (savedPrediction.locked) {
       const participant = participants.find((p) => p.accessCode === publicForm.accessCode) ?? { id: '', name: '' }
-      const printablePrediction = normalizePredictionSlip(saved.prediction)
       try {
         generatePredictionPdf({
           participant,
-          prediction: printablePrediction,
-          matches: getPrintableMatches(tournamentState.matches, printablePrediction),
+          prediction: savedPrediction,
+          matches: getPrintableMatches(tournamentState.matches, savedPrediction),
           tournamentState,
         })
       } catch (error) {

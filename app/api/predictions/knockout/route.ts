@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Prediction not found' }, { status: 404 })
     }
 
-    const willLock = Boolean(body.locked)
+    const willLock = true
 
     // Determine verification code if locking now
     const verificationCode = willLock && !existingPrediction.verificationCode
@@ -75,8 +75,8 @@ export async function POST(request: Request) {
     const savedPrediction = await prisma.prediction.upsert({
       where: { participantId: participant.id },
       update: {
-        locked: willLock ? true : existingPrediction.locked ?? false,
-        reopenRequested: willLock ? false : (body.reopenRequested ?? existingPrediction.reopenRequested ?? false),
+        locked: true,
+        reopenRequested: false,
         champion: typeof body.champion === 'string' ? body.champion : existingPrediction.champion,
         semifinalists: body.semifinalists ?? existingPrediction.semifinalists,
         topScorer: typeof body.topScorer === 'string' ? body.topScorer : existingPrediction.topScorer,
@@ -88,8 +88,8 @@ export async function POST(request: Request) {
       },
       create: {
         participantId: participant.id,
-        locked: willLock,
-        reopenRequested: willLock ? false : (body.reopenRequested ?? false),
+        locked: true,
+        reopenRequested: false,
         champion: body.champion ?? null,
         semifinalists: body.semifinalists ?? [],
         topScorer: body.topScorer ?? null,
