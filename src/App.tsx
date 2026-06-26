@@ -58,6 +58,10 @@ function participantName(participants: Participant[], participantId: string) {
   return participants.find((participant) => participant.id === participantId)?.name ?? ''
 }
 
+function stageLabel(stage: string) {
+  return stage === 'Ronda de 32' ? 'Dieciseisavos' : stage
+}
+
 function buildNameVariants(predictions: PredictionSlip[], field: 'topScorer' | 'mvp') {
   const variants = new Map<string, { value: string; count: number; normalized: string }>()
 
@@ -1707,7 +1711,7 @@ type="button"
 
                     {currentKnockoutStage && (
                       <div className="meta-card">
-                        <h3>{currentKnockoutStage === 'Ronda de 32' ? 'Dieciseisavos' : currentKnockoutStage}</h3>
+                        <h3>{stageLabel(currentKnockoutStage)}</h3>
                         <div className="knockout-prediction-list">
                           {resolvedTournamentState.matches
                             .filter((match) => match.stage === currentKnockoutStage)
@@ -1755,7 +1759,7 @@ type="button"
                           Guardar ronda
                         </button>
                         <button className="secondary-action" onClick={savePublicKnockoutFinal} type="button" disabled={publicKnockoutSaveDisabled}>
-                          Guardar y descargar PDF
+                          Enviar definitiva y descargar PDF
                         </button>
                       </div>
                     )}
@@ -1896,7 +1900,7 @@ type="button"
                       {closedPredictionStages
                         .filter((stage) => stage !== 'Grupo')
                         .map((stage) => (
-                          <option key={stage} value={stage}>{stage}</option>
+                          <option key={stage} value={stage}>{stageLabel(stage)}</option>
                         ))}
                     </select>
                   </label>
@@ -2313,7 +2317,7 @@ type="button"
               <div className="knockout-board">
                 {knockoutStages.map((stage) => (
                   <div className="knockout-column" key={stage}>
-                    <h4>{stage === 'Ronda de 32' ? 'Dieciseisavos' : stage}</h4>
+                    <h4>{stageLabel(stage)}</h4>
                     {tournamentState.matches
                       .filter((match) => match.stage === stage)
                       .map((match) => (
@@ -3007,7 +3011,7 @@ setMatchPredictions((current) => {
   value={currentKnockoutStage ?? activeKnockoutStage}
 >
                   {knockoutStages.map((stage) => (
-                    <option key={stage} value={stage}>{stage === 'Ronda de 32' ? 'Dieciseisavos' : stage}</option>
+                    <option key={stage} value={stage}>{stageLabel(stage)}</option>
                   ))}
                 </select>
               </label>
@@ -3763,7 +3767,7 @@ function PredictionReview({
 
                 return (
                   <div className="knockout-review-stage" key={stage}>
-                    <h4>{stage === 'Ronda de 32' ? 'Dieciseisavos' : stage}</h4>
+                    <h4>{stageLabel(stage)}</h4>
                     {stageMatches.map(({ match, matchPrediction }) => (
                       <div className="knockout-review-row" key={match.id}>
                         <span>{teamLabel(resolveKnockoutSlot(match.home, qualification) ?? match.home)}</span>
@@ -4363,7 +4367,7 @@ doc.text('Predicciones finales', 14, 85)
     }
 
     return [
-      match.group || match.stage,
+      match.group || stageLabel(match.stage),
       homeTeam,
       scoreDisplay,
       awayTeam,
