@@ -767,6 +767,20 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
       )
     }
   }
+
+  useEffect(() => {
+    const accessCode = publicForm.accessCode.trim()
+    if (!publicParticipant || publicParticipantPrediction || accessCode.length < 4) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      loadMyPrediction(accessCode)
+    }, 250)
+
+    return () => window.clearTimeout(timeout)
+  }, [publicForm.accessCode, publicParticipant, publicParticipantPrediction])
+
   const savePublicKnockoutPredictions = async () => {
     if (!currentKnockoutStage) return
 
