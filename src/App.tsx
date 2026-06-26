@@ -719,9 +719,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
   const publicCodeHasInput = enteredAccessCode.length > 0
   const publicFormRequiredCount = publicFormErrors.length
   const publicGroupFormDisabled = Boolean(publicParticipantPrediction?.locked) || initialPredictionClosed
-  const publicKnockoutSaveDisabled = Boolean(
-    publicParticipantPrediction?.locked || publicParticipantPrediction?.reopenRequested,
-  )
+  const publicKnockoutSaveDisabled = Boolean(publicParticipantPrediction?.reopenRequested)
   const resetPublicForm = (accessCode = '') => {
     if (!accessCode) {
       forgetAccessCode()
@@ -1600,7 +1598,7 @@ type="button"
                         <p className="form-description">
                           {publicParticipantPrediction.locked
                             ? currentKnockoutStage
-                              ? 'Tu fase de grupos está bloqueada. Las eliminatorias ya están abiertas.'
+                              ? 'Tu fase de grupos está bloqueada. Puedes completar la eliminatoria en curso.'
                               : 'Tu predicción está bloqueada y no puede ser modificada.'
                             : 'Tu predicción está pendiente de revisión.'}
                         </p>
@@ -1652,7 +1650,7 @@ type="button"
                             Descargar PDF
                           </button>
                         )}
-                        {publicParticipantPrediction.locked && (
+                        {publicParticipantPrediction.locked && !currentKnockoutStage && (
                           <button
                             className="secondary-action"
                             disabled={publicParticipantPrediction.reopenRequested || reopenRequestSubmitting}
@@ -3298,7 +3296,7 @@ setMatchPredictions((current) => {
             </div>
             <div className="rules-grid">
               <Rule title="Fase de grupos" text="Signo 1-X-2: 1 punto. Resultado exacto: 3 puntos en total. Acertar los 6 signos de un grupo suma 10 puntos extra por grupo." />
-              <Rule title="Eliminatorias" text="Se predice el marcador tras 120 minutos y, si hay empate, el ganador por penaltis. El signo acertado suma 2 puntos; el empate acertado sin exacto suma 1, el resultado exacto suma 3 y acertar los penaltis suma 1 extra." />
+              <Rule title="Eliminatorias" text="Se predice el marcador tras 120 minutos y, si hay empate, el ganador por penaltis. El signo 1-X-2 acertado suma 1 punto, el resultado exacto suma 3 puntos en total y acertar los penaltis suma 1 punto extra." />
               <Rule title="Bonus finales" text="Campeon: 40 puntos. Maximo goleador: 25 puntos. MVP: 25 puntos." />
               <Rule title="Premios" text="Habra premio para el 1er, 2o y 3er clasificado final. El importe de cada premio esta pendiente de confirmar." />
             </div>
@@ -3396,16 +3394,12 @@ setMatchPredictions((current) => {
                   </thead>
                   <tbody>
                     <tr>
-                      <td>Signo 1-2 acertado</td>
-                      <td>2</td>
-                    </tr>
-                    <tr>
-                      <td>Empate tras 120 minutos acertado sin resultado exacto</td>
+                      <td>Signo 1-X-2 acertado</td>
                       <td>1</td>
                     </tr>
                     <tr>
                       <td>Resultado exacto tras 120 minutos</td>
-                      <td>3</td>
+                      <td>3 en total</td>
                     </tr>
                     <tr>
                       <td>Ganador por penaltis acertado si se predijo empate</td>

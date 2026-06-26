@@ -66,10 +66,6 @@ export async function POST(request: Request) {
 
     const willLock = Boolean(body.locked)
 
-    if (existingPrediction.locked) {
-      return NextResponse.json({ error: 'Prediction is locked' }, { status: 409 })
-    }
-
     // Determine verification code if locking now
     const verificationCode = willLock && !existingPrediction.verificationCode
       ? `PORRA-2026-${crypto.randomUUID().slice(0, 8).toUpperCase()}`

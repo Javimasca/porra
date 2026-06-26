@@ -157,30 +157,23 @@ function scoreGroupMatch(prediction: MatchPrediction, match: Match) {
 }
 
 function scoreKnockoutMatch(prediction: MatchPrediction, match: Match) {
-  if (prediction.homeScore === prediction.awayScore) {
-    const drawPoints = match.homeScore === match.awayScore
-      ? exactScore(prediction, match) ? 3 : 1
-      : 0
-    const penaltyPoints = match.homeScore === match.awayScore && prediction.penaltyWinner === match.penaltyWinner
-      ? 1
-      : 0
-
-    return drawPoints + penaltyPoints
-  }
-
   if (exactScore(prediction, match)) {
-    return 3
+    return 3 + penaltyPoints(prediction, match)
   }
 
-  return sameSign(prediction, match) ? 2 : 0
+  return (sameSign(prediction, match) ? 1 : 0) + penaltyPoints(prediction, match)
 }
 
 function knockoutSignPoints(prediction: MatchPrediction, match: Match) {
-  if (prediction.homeScore === prediction.awayScore && match.homeScore === match.awayScore) {
-    return prediction.penaltyWinner === match.penaltyWinner ? 2 : 0
-  }
+  return sameSign(prediction, match) ? 1 : 0
+}
 
-  return sameSign(prediction, match) ? 2 : 0
+function penaltyPoints(prediction: MatchPrediction, match: Match) {
+  return prediction.homeScore === prediction.awayScore &&
+    match.homeScore === match.awayScore &&
+    prediction.penaltyWinner === match.penaltyWinner
+    ? 1
+    : 0
 }
 
 function sameSign(prediction: MatchPrediction, match: Match) {
@@ -251,7 +244,7 @@ function scoreKnockoutSignBonuses(prediction: PredictionSlip, state: TournamentS
     const matches = state.matches.filter((match) => match.stage === stage && match.status === 'finalizado')
     const hits = matches.filter((match) => {
       const pick = prediction.matches.find((item) => item.matchId === match.id)
-      return pick ? knockoutSignPoints(pick, match) === 2 : false
+      return pick ? knockoutSignPoints(pick, match) === 1 : false
     }).length
 
     return sum + (table[hits] ?? 0)

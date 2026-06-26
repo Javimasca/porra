@@ -93,7 +93,7 @@ describe('scorePrediction', () => {
     assert.equal(pointsFor('Bonus eliminatorias', prediction, state), 5)
   })
 
-  it('gives one knockout point for predicting penalties without the exact draw score', () => {
+  it('gives one knockout point for a non-exact draw sign', () => {
     const state: TournamentState = {
       semifinalists: [],
       groupWinners: {},
@@ -121,7 +121,7 @@ describe('scorePrediction', () => {
     }
 
     assert.equal(pointsFor('Eliminatorias', prediction, state), 1)
-    assert.equal(pointsFor('Bonus eliminatorias', prediction, state), 0)
+    assert.equal(pointsFor('Bonus eliminatorias', prediction, state), 5)
   })
 
   it('scores tournament bonuses from derived official outcomes', () => {
