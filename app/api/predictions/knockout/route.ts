@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       where: { participantId: participant.id },
       update: {
         locked: willLock ? true : existingPrediction.locked ?? false,
-        reopenRequested: body.reopenRequested ?? existingPrediction.reopenRequested ?? false,
+        reopenRequested: willLock ? false : (body.reopenRequested ?? existingPrediction.reopenRequested ?? false),
         champion: typeof body.champion === 'string' ? body.champion : existingPrediction.champion,
         semifinalists: body.semifinalists ?? existingPrediction.semifinalists,
         topScorer: typeof body.topScorer === 'string' ? body.topScorer : existingPrediction.topScorer,
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       create: {
         participantId: participant.id,
         locked: willLock,
-        reopenRequested: body.reopenRequested ?? false,
+        reopenRequested: willLock ? false : (body.reopenRequested ?? false),
         champion: body.champion ?? null,
         semifinalists: body.semifinalists ?? [],
         topScorer: body.topScorer ?? null,

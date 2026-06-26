@@ -700,6 +700,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
   const publicCodeHasInput = enteredAccessCode.length > 0
   const publicFormRequiredCount = publicFormErrors.length
   const publicGroupFormDisabled = Boolean(publicParticipantPrediction?.locked) || initialPredictionClosed
+  const publicKnockoutSaveDisabled = Boolean(publicParticipantPrediction?.reopenRequested)
   const resetPublicForm = (accessCode = '') => {
     if (!accessCode) {
       forgetAccessCode()
@@ -820,7 +821,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
       }
     }
 
-    window.alert('Predicción marcada como definitiva.')
+    window.alert('Ronda guardada y PDF generado.')
   }
   const savePublicPrediction = async (locked: boolean) => {
     if (!publicParticipant) return
@@ -1566,7 +1567,9 @@ type="button"
                         <h3>Tu porra ya está registrada, {publicParticipant.name}</h3>
                         <p className="form-description">
                           {publicParticipantPrediction.locked
-                            ? 'Tu predicción está bloqueada y no puede ser modificada.'
+                            ? currentKnockoutStage
+                              ? 'Tu fase de grupos está bloqueada. Las eliminatorias ya están abiertas.'
+                              : 'Tu predicción está bloqueada y no puede ser modificada.'
                             : 'Tu predicción está pendiente de revisión.'}
                         </p>
                       </div>
@@ -1684,6 +1687,7 @@ type="button"
                               <KnockoutPredictionRow
                                 key={match.id}
                                 match={match}
+                                disabled={publicKnockoutSaveDisabled}
                                 onChange={(matchId, side, value) => {
                                   const parsedValue = value === '' ? Number.NaN : Number(value)
                                   setPublicKnockoutPredictions((current) => {
@@ -1719,11 +1723,11 @@ type="button"
                               />
                             ))}
                         </div>
-                        <button className="primary-action" onClick={savePublicKnockoutPredictions} type="button">
+                        <button className="primary-action" onClick={savePublicKnockoutPredictions} type="button" disabled={publicKnockoutSaveDisabled}>
                           Guardar ronda
                         </button>
-                        <button className="secondary-action" onClick={savePublicKnockoutFinal} type="button">
-                          Marcar definitiva
+                        <button className="secondary-action" onClick={savePublicKnockoutFinal} type="button" disabled={publicKnockoutSaveDisabled}>
+                          Guardar y descargar PDF
                         </button>
                       </div>
                     )}
@@ -2538,6 +2542,7 @@ type="button"
                   )
                 }}
                 groupEditingClosed={initialPredictionClosed}
+                reopenDisabled={initialPredictionClosed && currentKnockoutStage === null}
                 participant={participants.find((participant) => participant.id === reviewParticipantId)}
                 prediction={predictions.find((prediction) => prediction.participantId === reviewParticipantId)}
                 tournamentState={tournamentState}
@@ -2611,8 +2616,8 @@ type="button"
                   disabled={!selectedPredictionParticipantId || (Boolean(selectedPrediction?.locked) && initialPredictionClosed)}
                   onClick={async () => {
                     const reopen = Boolean(selectedPrediction?.locked)
-                    if (reopen && initialPredictionClosed) {
-                      window.alert('La fase de grupos esta cerrada. Para reabrir predicciones, cambia la fase a preGroups.')
+                    if (reopen && initialPredictionClosed && currentKnockoutStage === null) {
+                      window.alert('La fase de grupos está cerrada. Para reabrir predicciones, cambia la fase a preGroups o espera a una fase eliminatoria abierta.')
                       return
                     }
                     if (reopen) {
@@ -3462,11 +3467,13 @@ function KnockoutPredictionRow({
   onChange,
   onPenaltyWinnerChange,
   prediction,
+  disabled,
 }: {
   match: Match
   onChange: (matchId: string, side: 'homeScore' | 'awayScore', value: string) => void
   onPenaltyWinnerChange: (matchId: string, penaltyWinner: string) => void
   prediction?: MatchPrediction
+  disabled?: boolean
 }) {
   const isDraw =
     prediction !== undefined &&
@@ -3484,6 +3491,7 @@ function KnockoutPredictionRow({
         <span>{teamLabel(match.home)}</span>
         <input
           aria-label={`${match.home} goles tras 120 minutos`}
+          disabled={disabled}
           min="0"
           onChange={(event) => onChange(match.id, 'homeScore', event.target.value)}
           type="number"
@@ -3492,6 +3500,7 @@ function KnockoutPredictionRow({
         <span className="prediction-separator">-</span>
         <input
           aria-label={`${match.away} goles tras 120 minutos`}
+          disabled={disabled}
           min="0"
           onChange={(event) => onChange(match.id, 'awayScore', event.target.value)}
           type="number"
@@ -3503,6 +3512,7 @@ function KnockoutPredictionRow({
         <label className="penalty-picker">
           Ganador por penaltis
           <select
+            disabled={disabled}
             onChange={(event) => onPenaltyWinnerChange(match.id, event.target.value)}
             value={prediction?.penaltyWinner ?? ''}
           >
@@ -3560,6 +3570,7 @@ function OfficialResultRow({
 
 function PredictionReview({
   groupEditingClosed,
+  reopenDisabled,
   onClose,
   onToggleLocked,
   participant,
@@ -3567,6 +3578,7 @@ function PredictionReview({
   tournamentState,
 }: {
   groupEditingClosed: boolean
+  reopenDisabled: boolean
   onClose: () => void
   onToggleLocked: (locked: boolean) => void
   participant?: Participant
@@ -3576,6 +3588,24 @@ function PredictionReview({
   if (!participant) {
     return null
   }
+
+  const qualification = useMemo(
+    () => buildQualification(tournamentState.matches),
+    [tournamentState.matches],
+  )
+
+  const knockoutMatchPredictions = useMemo(() => {
+    if (!prediction) return []
+    return prediction.matches
+      .map((matchPrediction) => {
+        const match = tournamentState.matches.find((item) => item.id === matchPrediction.matchId)
+        return match ? { match, matchPrediction } : null
+      })
+      .filter(
+        (item): item is { match: Match; matchPrediction: typeof prediction.matches[number] } => Boolean(item),
+      )
+      .filter(({ match }) => match.stage !== 'Grupo' && match.stage !== 'Bonus')
+  }, [prediction, tournamentState.matches])
 
   const completedMatches = prediction?.matches.filter(
     (match) => Number.isFinite(match.homeScore) && Number.isFinite(match.awayScore),
@@ -3608,7 +3638,7 @@ function PredictionReview({
           {prediction && (
   <button
     className="small-action"
-    disabled={prediction.locked && groupEditingClosed}
+    disabled={prediction.locked && (groupEditingClosed || reopenDisabled)}
     onClick={() => onToggleLocked(!prediction.locked)}
     type="button"
   >
@@ -3625,48 +3655,87 @@ function PredictionReview({
       {!prediction ? (
         <p className="muted-copy">Este participante aun no tiene prediccion guardada.</p>
       ) : (
-        <div className="review-grid">
-          <div className="score-pill">
-            <span>Estado</span>
-            <strong>{prediction.locked ? 'Definitiva' : 'Borrador'}</strong>
+        <>
+          <div className="review-grid">
+            <div className="score-pill">
+              <span>Estado</span>
+              <strong>{prediction.locked ? 'Definitiva' : 'Borrador'}</strong>
+            </div>
+            <div className="score-pill">
+              <span>Reapertura</span>
+              <strong>{prediction.reopenRequested ? 'Solicitada' : '-'}</strong>
+            </div>
+            <div className="score-pill">
+              <span>Fecha envio</span>
+              <strong>
+                {prediction.submittedAt
+                  ? new Date(prediction.submittedAt).toLocaleString()
+                  : '-'}
+              </strong>
+            </div>
+            <div className="score-pill">
+              <span>Marcadores de grupo</span>
+              <strong>{completedMatches}/72</strong>
+            </div>
+            <div className="score-pill">
+              <span>Campeon</span>
+              <strong>{prediction.champion || '-'}</strong>
+            </div>
+            <div className="score-pill">
+              <span>Semifinalistas</span>
+              <strong>{prediction.semifinalists.length}/4</strong>
+            </div>
+            <div className="score-pill">
+              <span>Mejores terceros</span>
+              <strong>{prediction.bestThirds.length}/8</strong>
+            </div>
+            <div className="score-pill">
+              <span>Goleador</span>
+              <strong>{prediction.topScorer || '-'}</strong>
+            </div>
+            <div className="score-pill">
+              <span>MVP</span>
+              <strong>{prediction.mvp || '-'}</strong>
+            </div>
           </div>
-          <div className="score-pill">
-            <span>Reapertura</span>
-            <strong>{prediction.reopenRequested ? 'Solicitada' : '-'}</strong>
-          </div>
-          <div className="score-pill">
-  <span>Fecha envio</span>
-  <strong>
-    {prediction.submittedAt
-      ? new Date(prediction.submittedAt).toLocaleString()
-      : '-'}
-  </strong>
-</div>
-          <div className="score-pill">
-            <span>Marcadores de grupo</span>
-            <strong>{completedMatches}/72</strong>
-          </div>
-          <div className="score-pill">
-            <span>Campeon</span>
-            <strong>{prediction.champion || '-'}</strong>
-          </div>
-          <div className="score-pill">
-            <span>Semifinalistas</span>
-            <strong>{prediction.semifinalists.length}/4</strong>
-          </div>
-          <div className="score-pill">
-            <span>Mejores terceros</span>
-            <strong>{prediction.bestThirds.length}/8</strong>
-          </div>
-          <div className="score-pill">
-            <span>Goleador</span>
-            <strong>{prediction.topScorer || '-'}</strong>
-          </div>
-          <div className="score-pill">
-            <span>MVP</span>
-            <strong>{prediction.mvp || '-'}</strong>
-          </div>
-        </div>
+          {knockoutMatchPredictions.length > 0 && (
+            <section className="review-section knockout-review-section">
+              <header className="subsection-header">
+                <p className="eyebrow">Eliminatorias</p>
+                <h3>Pronósticos eliminatorios</h3>
+              </header>
+              {knockoutStages.map((stage) => {
+                const stageMatches = knockoutMatchPredictions.filter(
+                  ({ match }) => match.stage === stage,
+                )
+
+                if (stageMatches.length === 0) {
+                  return null
+                }
+
+                return (
+                  <div className="knockout-review-stage" key={stage}>
+                    <h4>{stage === 'Ronda de 32' ? 'Dieciseisavos' : stage}</h4>
+                    {stageMatches.map(({ match, matchPrediction }) => (
+                      <div className="knockout-review-row" key={match.id}>
+                        <span>{teamLabel(resolveKnockoutSlot(match.home, qualification) ?? match.home)}</span>
+                        <strong>
+                          {matchPrediction.homeScore} - {matchPrediction.awayScore}
+                        </strong>
+                        <span>{teamLabel(resolveKnockoutSlot(match.away, qualification) ?? match.away)}</span>
+                        {matchPrediction.penaltyWinner && (
+                          <span className="penalty-label">
+                            pen. {teamLabel(resolveKnockoutSlot(matchPrediction.penaltyWinner, qualification) ?? matchPrediction.penaltyWinner)}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </section>
+          )}
+        </>
       )}
     </section>
   )
