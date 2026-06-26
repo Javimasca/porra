@@ -4241,7 +4241,8 @@ doc.text('Predicciones finales', 14, 85)
       predictionMatch.homeScore === predictionMatch.awayScore &&
       predictionMatch.penaltyWinner
     ) {
-      scoreDisplay += ` (${predictionMatch.penaltyWinner})`
+      const resolvedPenaltyWinner = resolveKnockoutSlot(predictionMatch.penaltyWinner, qualification)
+      scoreDisplay += ` (${resolvedPenaltyWinner ?? predictionMatch.penaltyWinner})`
     }
 
     return [
