@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const prediction = await getPrisma().prediction.update({
       where: { participantId },
       data: {
-        locked: reopen ? false : undefined,
+        locked: reopen ? false : true,
         reopenRequested: false,
       },
     })

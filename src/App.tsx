@@ -715,7 +715,9 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
   const publicCodeHasInput = enteredAccessCode.length > 0
   const publicFormRequiredCount = publicFormErrors.length
   const publicGroupFormDisabled = Boolean(publicParticipantPrediction?.locked) || initialPredictionClosed
-  const publicKnockoutSaveDisabled = Boolean(publicParticipantPrediction?.reopenRequested)
+  const publicKnockoutSaveDisabled = Boolean(
+    publicParticipantPrediction?.locked || publicParticipantPrediction?.reopenRequested,
+  )
   const resetPublicForm = (accessCode = '') => {
     if (!accessCode) {
       forgetAccessCode()
@@ -1703,7 +1705,7 @@ type="button"
                       </div>
                     </div>
 
-                    {currentKnockoutStage && publicParticipantPrediction.locked && (
+                    {currentKnockoutStage && (
                       <div className="meta-card">
                         <h3>{currentKnockoutStage === 'Ronda de 32' ? 'Dieciseisavos' : currentKnockoutStage}</h3>
                         <div className="knockout-prediction-list">
@@ -2208,9 +2210,9 @@ type="button"
                     <div className="row-actions">
                       <button
                         className="small-action"
-                        disabled={initialPredictionClosed}
+                        disabled={initialPredictionClosed && currentKnockoutStage === null}
                         onClick={async () => {
-                          if (initialPredictionClosed) return
+                          if (initialPredictionClosed && currentKnockoutStage === null) return
                           const nextPredictions = predictions.map((item) =>
                               item.participantId === prediction.participantId
                                 ? {
@@ -2639,19 +2641,20 @@ type="button"
                 </button>
                 <button
                   className="secondary-action"
-                  disabled={!selectedPredictionParticipantId || (Boolean(selectedPrediction?.locked) && initialPredictionClosed)}
+                  disabled={
+                    !selectedPredictionParticipantId ||
+                    (Boolean(selectedPrediction?.locked) && initialPredictionClosed && currentKnockoutStage === null)
+                  }
                   onClick={async () => {
                     const reopen = Boolean(selectedPrediction?.locked)
                     if (reopen && initialPredictionClosed && currentKnockoutStage === null) {
                       window.alert('La fase de grupos está cerrada. Para reabrir predicciones, cambia la fase a preGroups o espera a una fase eliminatoria abierta.')
                       return
                     }
-                    if (reopen) {
-                      const saved = await updateAdminReopenRequest(selectedPredictionParticipantId, true, adminPinInput)
-                      if (!saved) {
-                        window.alert('No se pudo reabrir la prediccion.')
-                        return
-                      }
+                    const saved = await updateAdminReopenRequest(selectedPredictionParticipantId, reopen, adminPinInput)
+                    if (!saved) {
+                      window.alert(reopen ? 'No se pudo reabrir la prediccion.' : 'No se pudo marcar la prediccion como definitiva.')
+                      return
                     }
 
                     setPredictions((current) =>
