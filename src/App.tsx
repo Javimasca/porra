@@ -491,6 +491,24 @@ if (!tournamentResponse.ok) {
   }, [adminAuthenticated, adminPinInput, apiReady, tournamentState])
 
   useEffect(() => {
+    if (!adminAuthenticated || mode !== 'admin' || activeTab !== 'Eliminatorias') {
+      return
+    }
+
+    let cancelled = false
+
+    loadAdminPredictions(adminPinInput).then((adminPredictions) => {
+      if (!cancelled && adminPredictions) {
+        setPredictions(adminPredictions)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeTab, adminAuthenticated, adminPinInput, mode])
+
+  useEffect(() => {
     let cancelled = false
 
     if (!selectedPredictionParticipantId) {
@@ -2961,6 +2979,21 @@ setMatchPredictions((current) => {
                 <p className="eyebrow">Ronda a ronda</p>
                 <h2>Predicciones de eliminatorias</h2>
               </div>
+              <div className="header-actions">
+                <button
+                  className="secondary-action"
+                  onClick={async () => {
+                    const adminPredictions = await loadAdminPredictions(adminPinInput)
+                    if (adminPredictions) {
+                      setPredictions(adminPredictions)
+                    } else {
+                      window.alert('No se pudieron cargar las predicciones.')
+                    }
+                  }}
+                  type="button"
+                >
+                  Actualizar
+                </button>
               <button
   className="primary-action"
   disabled={!selectedKnockoutParticipantId || !knockoutEditingEnabled}
@@ -3030,6 +3063,7 @@ setMatchPredictions((current) => {
               >
                 {knockoutEditingEnabled ? 'Guardar ronda' : 'Ronda cerrada'}
               </button>
+              </div>
             </header>
 
             <div className="prediction-toolbar">
