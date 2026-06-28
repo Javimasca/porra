@@ -4169,21 +4169,28 @@ function assignThirdPlacedSlots(bestThirds: GroupTeamStanding[]) {
     '3E/F/G/I/J',
     '3D/E/I/J/L',
   ]
+  const slotPriorities: Record<string, string[]> = {
+    '3A/B/C/D/F': ['D'],
+    '3E/F/G/I/J': ['G', 'J'],
+  }
   const assignments: Record<string, string> = {}
   const usedTeams = new Set<string>()
 
   slots.forEach((slot) => {
     const eligibleGroups = slot.replace('3', '').split('/')
-    const third = bestThirds.find(
+    const priorityGroups = slotPriorities[slot] ?? []
+    const selectedThird = bestThirds.find(
+      (standing) => priorityGroups.includes(standing.group) && !usedTeams.has(standing.team),
+    ) ?? bestThirds.find(
       (standing) => eligibleGroups.includes(standing.group) && !usedTeams.has(standing.team),
     )
 
-    if (!third) {
+    if (!selectedThird) {
       return
     }
 
-    assignments[slot] = third.team
-    usedTeams.add(third.team)
+    assignments[slot] = selectedThird.team
+    usedTeams.add(selectedThird.team)
   })
 
   return assignments
