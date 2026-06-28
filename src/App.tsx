@@ -319,6 +319,7 @@ function App() {
   const [selectedPublicMatchId, setSelectedPublicMatchId] = useState('')
   const [selectedKnockoutParticipantId, setSelectedKnockoutParticipantId] = useState('')
   const [activeKnockoutStage, setActiveKnockoutStage] = useState<(typeof knockoutStages)[number]>('Ronda de 32')
+  const [showRoundOf32Pending, setShowRoundOf32Pending] = useState(false)
   const [matchPredictions, setMatchPredictions] = useState<Record<string, MatchPrediction>>({})
   const [knockoutPredictions, setKnockoutPredictions] = useState<Record<string, MatchPrediction>>({})
   const [publicKnockoutPredictions, setPublicKnockoutPredictions] = useState<Record<string, MatchPrediction>>({})
@@ -701,6 +702,29 @@ const currentKnockoutStage =
     : null
 
 const knockoutEditingEnabled = currentKnockoutStage !== null
+const publicCurrentKnockoutComplete = Boolean(
+  publicParticipantPrediction &&
+  currentKnockoutStage &&
+  hasCompleteStagePredictions(publicParticipantPrediction, resolvedTournamentState.matches, currentKnockoutStage),
+)
+const roundOf32PredictionStatus = useMemo(() => {
+  const closed: Participant[] = []
+  const pending: Participant[] = []
+
+  validatedParticipants.forEach((participant) => {
+    const prediction = predictions.find((item) => item.participantId === participant.id)
+    if (prediction && hasCompleteStagePredictions(prediction, resolvedTournamentState.matches, 'Ronda de 32')) {
+      closed.push(participant)
+    } else {
+      pending.push(participant)
+    }
+  })
+
+  return {
+    closed,
+    pending: sortParticipantsByName(pending),
+  }
+}, [predictions, resolvedTournamentState.matches, validatedParticipants])
 
   useEffect(() => {
     let cancelled = false
@@ -746,7 +770,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
   const publicFormRequiredCount = publicFormErrors.length
   const publicGroupFormDisabled = Boolean(publicParticipantPrediction?.locked) || initialPredictionClosed
   const publicKnockoutSaveDisabled = Boolean(
-    publicParticipantPrediction?.locked || publicParticipantPrediction?.reopenRequested,
+    publicCurrentKnockoutComplete || publicParticipantPrediction?.reopenRequested,
   )
   const resetPublicForm = (accessCode = '') => {
     if (!accessCode) {
@@ -1820,10 +1844,10 @@ type="button"
                             ))}
                         </div>
                         <button className="primary-action" onClick={savePublicKnockoutPredictions} type="button" disabled={publicKnockoutSaveDisabled}>
-                          {publicParticipantPrediction.locked ? 'Ronda definitiva' : 'Guardar ronda'}
+                          {publicCurrentKnockoutComplete ? 'Ronda definitiva' : 'Guardar ronda'}
                         </button>
                         <button className="secondary-action" onClick={savePublicKnockoutFinal} type="button" disabled={publicKnockoutSaveDisabled}>
-                          {publicParticipantPrediction.locked ? 'Definitiva enviada' : 'Enviar definitiva y descargar PDF'}
+                          {publicCurrentKnockoutComplete ? 'Definitiva enviada' : 'Enviar definitiva y descargar PDF'}
                         </button>
                       </div>
                     )}
@@ -2192,6 +2216,15 @@ type="button"
               <Metric label="Pagos pendientes" value={pendingPlayers.length.toString()} />
               <Metric label="Partidos cerrados" value={completedMatches.length.toString()} />
               <Metric label="Porras bloqueadas" value={lockedPredictions.length.toString()} />
+              <Metric label="Dieciseisavos cerradas" value={roundOf32PredictionStatus.closed.length.toString()} />
+              <button
+                className="metric metric-button"
+                onClick={() => setShowRoundOf32Pending((current) => !current)}
+                type="button"
+              >
+                <span>Dieciseisavos pendientes</span>
+                <strong>{roundOf32PredictionStatus.pending.length}</strong>
+              </button>
               <button
   className="metric metric-button"
   onClick={() => setActiveTab('Solicitudes')}
@@ -2201,6 +2234,34 @@ type="button"
   <strong>{reopenRequests.length}</strong>
 </button>
             </section>
+
+            {showRoundOf32Pending && (
+              <section className="panel pending-round-panel">
+                <div className="panel-title">
+                  <h3>Pendientes de dieciseisavos</h3>
+                  <span>{roundOf32PredictionStatus.pending.length} participantes</span>
+                </div>
+                {roundOf32PredictionStatus.pending.length === 0 ? (
+                  <p>Todos los participantes validados tienen cerrada la ronda.</p>
+                ) : (
+                  <div className="pending-chip-list">
+                    {roundOf32PredictionStatus.pending.map((participant) => (
+                      <button
+                        className="pending-chip"
+                        key={participant.id}
+                        onClick={() => {
+                          setSelectedKnockoutParticipantId(participant.id)
+                          setActiveTab('Eliminatorias')
+                        }}
+                        type="button"
+                      >
+                        {participant.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
 
             <section className="content-grid">
               <div className="panel wide">
@@ -5136,6 +5197,20 @@ function formatDate(date?: string) {
   if (!date) return '-'
   const [, month, day] = date.split('-')
   return `${day}/${month}`
+}
+
+function hasCompleteStagePredictions(prediction: PredictionSlip, matches: Match[], stage: Match['stage']) {
+  const stageMatches = matches.filter((match) => match.stage === stage)
+  if (stageMatches.length === 0) return false
+
+  return stageMatches.every((match) => {
+    const pick = prediction.matches.find((item) => item.matchId === match.id)
+    return Boolean(
+      pick &&
+      Number.isFinite(pick.homeScore) &&
+      Number.isFinite(pick.awayScore),
+    )
+  })
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

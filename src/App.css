@@ -453,6 +453,30 @@ td {
   font-size: 2rem;
 }
 
+.pending-round-panel {
+  margin-bottom: 24px;
+}
+
+.pending-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pending-chip {
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #12343b;
+  font-weight: 700;
+  padding: 10px 12px;
+}
+
+.pending-chip:hover {
+  border-color: var(--teal-700);
+  background: #e8f3ef;
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.8fr);
