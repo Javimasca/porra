@@ -3349,6 +3349,8 @@ setMatchPredictions((current) => {
                       <OfficialResultRow
                         key={match.id}
                         match={match}
+                        displayAway={resolveKnockoutSlot(match.away, qualification)}
+                        displayHome={resolveKnockoutSlot(match.home, qualification)}
                         onChange={updateOfficialMatchScore}
                         onStatusChange={updateOfficialMatchStatus}
                       />
@@ -3773,20 +3775,27 @@ function KnockoutPredictionRow({
 }
 
 function OfficialResultRow({
+  displayAway,
+  displayHome,
   match,
   onChange,
   onStatusChange,
 }: {
+  displayAway?: string
+  displayHome?: string
   match: Match
   onChange: (matchId: string, side: 'homeScore' | 'awayScore', value: string) => void
   onStatusChange: (matchId: string, status: Match['status']) => void
 }) {
+  const homeTeam = displayHome ?? match.home
+  const awayTeam = displayAway ?? match.away
+
   return (
     <div className="official-result-row">
       <time>{formatDate(match.date)}</time>
-      <span>{teamLabel(match.home)}</span>
+      <span>{teamLabel(homeTeam)}</span>
       <input
-        aria-label={`Resultado oficial ${match.home}`}
+        aria-label={`Resultado oficial ${homeTeam}`}
         min="0"
         onChange={(event) => onChange(match.id, 'homeScore', event.target.value)}
         type="number"
@@ -3794,13 +3803,13 @@ function OfficialResultRow({
       />
       <span className="prediction-separator">-</span>
       <input
-        aria-label={`Resultado oficial ${match.away}`}
+        aria-label={`Resultado oficial ${awayTeam}`}
         min="0"
         onChange={(event) => onChange(match.id, 'awayScore', event.target.value)}
         type="number"
         value={match.awayScore ?? ''}
       />
-      <span>{teamLabel(match.away)}</span>
+      <span>{teamLabel(awayTeam)}</span>
       <select
         aria-label={`Estado ${match.home} contra ${match.away}`}
         onChange={(event) => onStatusChange(match.id, event.target.value as Match['status'])}
