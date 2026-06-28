@@ -4,7 +4,7 @@ import { getPrisma } from '../../../../src/lib/prisma'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const accessCode = typeof body?.accessCode === 'string' ? body.accessCode : ''
+    const accessCode = typeof body?.accessCode === 'string' ? body.accessCode.trim() : ''
 
     if (!accessCode) {
       return NextResponse.json({ error: 'Invalid access code' }, { status: 400 })
@@ -62,4 +62,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
   }
 }
-

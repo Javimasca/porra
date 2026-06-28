@@ -806,14 +806,24 @@ const roundOf32PredictionStatus = useMemo(() => {
     )
 
     if (result.prediction) {
+      const normalizedPrediction = normalizePredictionSlip(result.prediction)
       setPredictions((current) =>
-        current.some((prediction) => prediction.participantId === result.prediction?.participantId)
+        current.some((prediction) => prediction.participantId === normalizedPrediction.participantId)
           ? current.map((prediction) =>
-              prediction.participantId === result.prediction?.participantId
-                ? normalizePredictionSlip(result.prediction)
+              prediction.participantId === normalizedPrediction.participantId
+                ? normalizedPrediction
                 : prediction,
             )
-          : [...current, result.prediction],
+          : [...current, normalizedPrediction],
+      )
+      setPublicPredictions((current) =>
+        current.some((prediction) => prediction.participantId === normalizedPrediction.participantId)
+          ? current.map((prediction) =>
+              prediction.participantId === normalizedPrediction.participantId
+                ? normalizedPrediction
+                : prediction,
+            )
+          : [...current, normalizedPrediction],
       )
     }
 

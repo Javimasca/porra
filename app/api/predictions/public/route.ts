@@ -27,7 +27,7 @@ export async function GET() {
     }
 
     const predictions = await prisma.prediction.findMany({
-      where: { locked: true, participant: { status: 'validado' } },
+      where: { participant: { status: 'validado' } },
       include: {
         participant: true,
         matches: { include: { match: true } },
