@@ -319,6 +319,7 @@ function App() {
   const [selectedPublicMatchId, setSelectedPublicMatchId] = useState('')
   const [selectedKnockoutParticipantId, setSelectedKnockoutParticipantId] = useState('')
   const [activeKnockoutStage, setActiveKnockoutStage] = useState<(typeof knockoutStages)[number]>('Ronda de 32')
+  const [officialResultsStage, setOfficialResultsStage] = useState<Match['stage']>('Grupo')
   const [showRoundOf32Pending, setShowRoundOf32Pending] = useState(false)
   const [matchPredictions, setMatchPredictions] = useState<Record<string, MatchPrediction>>({})
   const [knockoutPredictions, setKnockoutPredictions] = useState<Record<string, MatchPrediction>>({})
@@ -1091,6 +1092,37 @@ const roundOf32PredictionStatus = useMemo(() => {
       mvp: typeof saved.data.mvp === 'string' ? saved.data.mvp : tournamentState.mvp,
       matches: savedMatches.map(normalizeMatch),
     })
+  }
+  const updateOfficialMatchScore = (matchId: string, side: 'homeScore' | 'awayScore', value: string) => {
+    const parsedValue = value === '' ? undefined : Number(value)
+    setTournamentState((current) => ({
+      ...current,
+      matches: current.matches.map((item) => {
+        if (item.id !== matchId) {
+          return item
+        }
+
+        const nextMatch = { ...item, [side]: parsedValue }
+        const hasResult = nextMatch.homeScore !== undefined && nextMatch.awayScore !== undefined
+
+        return {
+          ...nextMatch,
+          status: hasResult
+            ? nextMatch.status === 'programado'
+              ? 'en_juego'
+              : nextMatch.status
+            : 'programado',
+        }
+      }),
+    }))
+  }
+  const updateOfficialMatchStatus = (matchId: string, status: Match['status']) => {
+    setTournamentState((current) => ({
+      ...current,
+      matches: current.matches.map((item) => (
+        item.id === matchId ? { ...item, status } : item
+      )),
+    }))
   }
   const saveParticipants = async (nextParticipants = participants) => {
     if (!adminAuthenticated) {
@@ -3245,16 +3277,18 @@ setMatchPredictions((current) => {
             <header className="section-header">
               <div>
                 <p className="eyebrow">Panel admin</p>
-                <h2>Resultados oficiales de grupos</h2>
+                <h2>Resultados oficiales</h2>
               </div>
               <div className="header-actions">
-                <button
-                  className="secondary-action"
-                  onClick={() => setTournamentState((current) => seedOfficialGroupResults(current))}
-                  type="button"
-                >
-                  Cargar demo
-                </button>
+                {officialResultsStage === 'Grupo' && (
+                  <button
+                    className="secondary-action"
+                    onClick={() => setTournamentState((current) => seedOfficialGroupResults(current))}
+                    type="button"
+                  >
+                    Cargar demo
+                  </button>
+                )}
                 <button
                   className="secondary-action"
                   onClick={resetOfficialResults}
@@ -3271,8 +3305,26 @@ setMatchPredictions((current) => {
                 </button>
               </div>
             </header>
+            <div className="prediction-toolbar">
+              <label>
+                Fase
+                <select
+                  onChange={(event) => setOfficialResultsStage(event.target.value as Match['stage'])}
+                  value={officialResultsStage}
+                >
+                  <option value="Grupo">Fase de grupos</option>
+                  {knockoutStages.map((stage) => (
+                    <option key={stage} value={stage}>{stageLabel(stage)}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="prediction-summary">
+                <strong>{tournamentState.matches.filter((match) => match.stage === officialResultsStage).length}</strong>
+                <span>partidos</span>
+              </div>
+            </div>
             <div className="results-board">
-              {groups.map((group) => (
+              {officialResultsStage === 'Grupo' ? groups.map((group) => (
                 <article className="results-group" key={group}>
                   <h3>
                     Grupo <span translate="no">{group}</span>
@@ -3283,42 +3335,26 @@ setMatchPredictions((current) => {
                       <OfficialResultRow
                         key={match.id}
                         match={match}
-                        onChange={(matchId, side, value) => {
-                          const parsedValue = value === '' ? undefined : Number(value)
-                          setTournamentState((current) => ({
-                            ...current,
-                            matches: current.matches.map((item) => {
-                              if (item.id !== matchId) {
-                                return item
-                              }
-
-                              const nextMatch = { ...item, [side]: parsedValue }
-                              const hasResult =
-                                nextMatch.homeScore !== undefined && nextMatch.awayScore !== undefined
-
-                              return {
-                                ...nextMatch,
-                                status: hasResult
-                                  ? nextMatch.status === 'programado'
-                                    ? 'en_juego'
-                                    : nextMatch.status
-                                  : 'programado',
-                              }
-                            }),
-                          }))
-                        }}
-                        onStatusChange={(matchId, status) => {
-                          setTournamentState((current) => ({
-                            ...current,
-                            matches: current.matches.map((item) => (
-                              item.id === matchId ? { ...item, status } : item
-                            )),
-                          }))
-                        }}
+                        onChange={updateOfficialMatchScore}
+                        onStatusChange={updateOfficialMatchStatus}
                       />
                     ))}
                 </article>
-              ))}
+              )) : (
+                <article className="results-group">
+                  <h3>{stageLabel(officialResultsStage)}</h3>
+                  {tournamentState.matches
+                    .filter((match) => match.stage === officialResultsStage)
+                    .map((match) => (
+                      <OfficialResultRow
+                        key={match.id}
+                        match={match}
+                        onChange={updateOfficialMatchScore}
+                        onStatusChange={updateOfficialMatchStatus}
+                      />
+                    ))}
+                </article>
+              )}
             </div>
           </section>
         )}
