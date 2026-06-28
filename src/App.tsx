@@ -769,9 +769,7 @@ const roundOf32PredictionStatus = useMemo(() => {
   const publicCodeHasInput = enteredAccessCode.length > 0
   const publicFormRequiredCount = publicFormErrors.length
   const publicGroupFormDisabled = Boolean(publicParticipantPrediction?.locked) || initialPredictionClosed
-  const publicKnockoutSaveDisabled = Boolean(
-    publicCurrentKnockoutComplete || publicParticipantPrediction?.reopenRequested,
-  )
+  const publicKnockoutSaveDisabled = publicCurrentKnockoutComplete
   const resetPublicForm = (accessCode = '') => {
     if (!accessCode) {
       forgetAccessCode()
