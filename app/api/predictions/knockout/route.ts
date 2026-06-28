@@ -40,7 +40,7 @@ async function currentPredictionPhase() {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const accessCode = typeof body?.accessCode === 'string' ? body.accessCode : ''
+    const accessCode = typeof body?.accessCode === 'string' ? body.accessCode.trim() : ''
     const matches = Array.isArray(body?.matches) ? body.matches : []
     const phase = await currentPredictionPhase()
 
