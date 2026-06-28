@@ -745,7 +745,9 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
   const publicCodeHasInput = enteredAccessCode.length > 0
   const publicFormRequiredCount = publicFormErrors.length
   const publicGroupFormDisabled = Boolean(publicParticipantPrediction?.locked) || initialPredictionClosed
-  const publicKnockoutSaveDisabled = Boolean(publicParticipantPrediction?.reopenRequested)
+  const publicKnockoutSaveDisabled = Boolean(
+    publicParticipantPrediction?.locked || publicParticipantPrediction?.reopenRequested,
+  )
   const resetPublicForm = (accessCode = '') => {
     if (!accessCode) {
       forgetAccessCode()
@@ -1818,10 +1820,10 @@ type="button"
                             ))}
                         </div>
                         <button className="primary-action" onClick={savePublicKnockoutPredictions} type="button" disabled={publicKnockoutSaveDisabled}>
-                          Guardar ronda
+                          {publicParticipantPrediction.locked ? 'Ronda definitiva' : 'Guardar ronda'}
                         </button>
                         <button className="secondary-action" onClick={savePublicKnockoutFinal} type="button" disabled={publicKnockoutSaveDisabled}>
-                          Enviar definitiva y descargar PDF
+                          {publicParticipantPrediction.locked ? 'Definitiva enviada' : 'Enviar definitiva y descargar PDF'}
                         </button>
                       </div>
                     )}
