@@ -705,6 +705,7 @@ const knockoutEditingEnabled = currentKnockoutStage !== null
 const publicCurrentKnockoutComplete = Boolean(
   publicParticipantPrediction &&
   currentKnockoutStage &&
+  publicParticipantPrediction.locked &&
   hasCompleteStagePredictions(publicParticipantPrediction, resolvedTournamentState.matches, currentKnockoutStage),
 )
 const roundOf32PredictionStatus = useMemo(() => {
@@ -713,7 +714,7 @@ const roundOf32PredictionStatus = useMemo(() => {
 
   validatedParticipants.forEach((participant) => {
     const prediction = predictions.find((item) => item.participantId === participant.id)
-    if (prediction && hasCompleteStagePredictions(prediction, resolvedTournamentState.matches, 'Ronda de 32')) {
+    if (prediction?.locked && hasCompleteStagePredictions(prediction, resolvedTournamentState.matches, 'Ronda de 32')) {
       closed.push(participant)
     } else {
       pending.push(participant)
@@ -849,7 +850,11 @@ const roundOf32PredictionStatus = useMemo(() => {
     const filledPredictions = Object.values(publicKnockoutPredictions).filter(
       (prediction) => Number.isFinite(prediction.homeScore) && Number.isFinite(prediction.awayScore),
     )
-    const saved = await submitPublicKnockoutPredictions({ accessCode: publicForm.accessCode, matches: filledPredictions })
+    const saved = await submitPublicKnockoutPredictions({
+      accessCode: publicForm.accessCode,
+      locked: false,
+      matches: filledPredictions,
+    })
 
     if (!saved.ok || !saved.prediction) {
       window.alert(saved.error)
@@ -1704,7 +1709,9 @@ type="button"
                             ? currentKnockoutStage
                               ? 'Tu fase de grupos está bloqueada. Puedes completar la eliminatoria en curso.'
                               : 'Tu predicción está bloqueada y no puede ser modificada.'
-                            : 'Tu predicción está pendiente de revisión.'}
+                            : currentKnockoutStage
+                              ? 'Tu predicción está reabierta. Puedes modificar la eliminatoria en curso.'
+                              : 'Tu predicción está pendiente de revisión.'}
                         </p>
                       </div>
                       <div className="greeting-actions">

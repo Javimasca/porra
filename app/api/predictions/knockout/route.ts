@@ -41,6 +41,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const accessCode = typeof body?.accessCode === 'string' ? body.accessCode.trim() : ''
+    const willLock = body?.locked !== false
     const matches = Array.isArray(body?.matches) ? body.matches : []
     const phase = await currentPredictionPhase()
 
@@ -64,8 +65,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Prediction not found' }, { status: 404 })
     }
 
-    const willLock = true
-
     // Determine verification code if locking now
     const verificationCode = willLock && !existingPrediction.verificationCode
       ? `PORRA-2026-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
@@ -82,7 +81,7 @@ export async function POST(request: Request) {
       const savedPrediction = await tx.prediction.upsert({
         where: { participantId: participant.id },
         update: {
-          locked: true,
+          locked: willLock,
           reopenRequested: false,
           champion: typeof body.champion === 'string' ? body.champion : existingPrediction.champion,
           semifinalists: body.semifinalists ?? existingPrediction.semifinalists,
@@ -95,7 +94,7 @@ export async function POST(request: Request) {
         },
         create: {
           participantId: participant.id,
-          locked: true,
+          locked: willLock,
           reopenRequested: false,
           champion: body.champion ?? null,
           semifinalists: body.semifinalists ?? [],
