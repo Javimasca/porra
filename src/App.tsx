@@ -816,6 +816,8 @@ const roundOf32PredictionStatus = useMemo(() => {
           : [...current, result.prediction],
       )
     }
+
+    return result
   }
 
   useEffect(() => {
@@ -1227,8 +1229,10 @@ const roundOf32PredictionStatus = useMemo(() => {
                       onChange={(event) => setPublicForm((form) => ({ ...form, accessCode: event.target.value }))}
                       onKeyDown={async (event) => {
                         if (event.key === 'Enter' && publicParticipant) {
-                          await loadMyPrediction(publicForm.accessCode)
-                          setPublicFormStep('form')
+                          const result = await loadMyPrediction(publicForm.accessCode)
+                          if (result) {
+                            setPublicFormStep('form')
+                          }
                         }
                       }}
                       placeholder="Ej: Javier2086"
@@ -1249,8 +1253,10 @@ const roundOf32PredictionStatus = useMemo(() => {
                       <button
                         className="primary-action"
                         onClick={async () => {
-                          await loadMyPrediction(publicForm.accessCode)
-                          setPublicFormStep('form')
+                          const result = await loadMyPrediction(publicForm.accessCode)
+                          if (result) {
+                            setPublicFormStep('form')
+                          }
                         }}
                         type="button"
                       >
