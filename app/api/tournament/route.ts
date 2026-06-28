@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '../../../src/lib/apiSecurity'
+import { tournamentState as officialTournamentState } from '../../../src/data/mockData'
 import { getPrisma } from '../../../src/lib/prisma'
 
 const stages = new Set(['Grupo', 'Ronda de 32', 'Octavos', 'Cuartos', 'Semifinal', 'Final'])
@@ -47,6 +48,59 @@ async function saveSetting(prisma: ReturnType<typeof getPrisma>, key: string, va
     SET value = EXCLUDED.value,
         updated_at = NOW()
   `
+}
+
+async function syncOfficialKnockoutSchedule(prisma: ReturnType<typeof getPrisma>) {
+  const officialMatches = officialTournamentState.matches.filter((match) => match.stage !== 'Grupo')
+  const existingMatches = await prisma.match.findMany({
+    where: { id: { in: officialMatches.map((match) => match.id) } },
+    select: { id: true, group: true, stage: true, date: true, venue: true, home: true, away: true },
+  })
+  const existingById = new Map(existingMatches.map((match) => [match.id, match]))
+  const changedMatches = officialMatches.filter((match) => {
+    const current = existingById.get(match.id)
+    return !current ||
+      current.group !== (match.group ?? null) ||
+      current.stage !== match.stage ||
+      !sameNullableDate(current.date, match.date) ||
+      current.venue !== (match.venue ?? null) ||
+      current.home !== match.home ||
+      current.away !== match.away
+  })
+
+  if (changedMatches.length === 0) {
+    return
+  }
+
+  await prisma.$transaction(
+    changedMatches.map((match) =>
+      prisma.match.upsert({
+        where: { id: match.id },
+        update: {
+          group: match.group,
+          stage: match.stage,
+          date: dateFromMatch(match.date),
+          venue: match.venue,
+          home: match.home,
+          away: match.away,
+        },
+        create: {
+          id: match.id,
+          group: match.group,
+          stage: match.stage,
+          date: dateFromMatch(match.date),
+          venue: match.venue,
+          home: match.home,
+          away: match.away,
+          homeScore: match.homeScore ?? null,
+          awayScore: match.awayScore ?? null,
+          penaltyWinner: match.penaltyWinner ?? null,
+          status: match.status,
+        },
+      }),
+    ),
+    { timeout: 20000 },
+  )
 }
 
 function sameNullableDate(left: Date | null, right?: string) {
@@ -128,6 +182,7 @@ function isMatch(value: unknown): value is {
 export async function GET() {
   try {
     const prisma = getPrisma()
+    await syncOfficialKnockoutSchedule(prisma)
     const matches = await prisma.match.findMany({
       orderBy: [{ stage: 'asc' }, { date: 'asc' }, { id: 'asc' }],
     })
