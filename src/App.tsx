@@ -1880,12 +1880,18 @@ type="button"
                                       awayScore: Number.NaN,
                                     }
 
+                                    const nextPrediction = {
+                                      ...previous,
+                                      [side]: parsedValue,
+                                    }
+                                    const isDraw =
+                                      Number.isFinite(nextPrediction.homeScore) &&
+                                      Number.isFinite(nextPrediction.awayScore) &&
+                                      nextPrediction.homeScore === nextPrediction.awayScore
+
                                     return {
                                       ...current,
-                                      [matchId]: {
-                                        ...previous,
-                                        [side]: parsedValue,
-                                      },
+                                      [matchId]: isDraw ? nextPrediction : { ...nextPrediction, penaltyWinner: undefined },
                                     }
                                   })
                                 }}
@@ -3249,12 +3255,18 @@ setMatchPredictions((current) => {
                           awayScore: Number.NaN,
                         }
 
+                        const nextPrediction = {
+                          ...previous,
+                          [side]: parsedValue,
+                        }
+                        const isDraw =
+                          Number.isFinite(nextPrediction.homeScore) &&
+                          Number.isFinite(nextPrediction.awayScore) &&
+                          nextPrediction.homeScore === nextPrediction.awayScore
+
                         return {
                           ...current,
-                          [matchId]: {
-                            ...previous,
-                            [side]: parsedValue,
-                          },
+                          [matchId]: isDraw ? nextPrediction : { ...nextPrediction, penaltyWinner: undefined },
                         }
                       })
                     }}
@@ -4007,7 +4019,7 @@ function PredictionReview({
                           {matchPrediction.homeScore} - {matchPrediction.awayScore}
                         </strong>
                         <span>{teamLabel(resolveKnockoutSlot(match.away, qualification) ?? match.away)}</span>
-                        {matchPrediction.penaltyWinner && (
+                        {matchPrediction.homeScore === matchPrediction.awayScore && matchPrediction.penaltyWinner && (
                           <span className="penalty-label">
                             pen. {teamLabel(resolveKnockoutSlot(matchPrediction.penaltyWinner, qualification) ?? matchPrediction.penaltyWinner)}
                           </span>
@@ -4111,7 +4123,9 @@ function PublicMatchPredictionsTable({
                 <strong>{row.pick?.homeScore}</strong>
                 {' - '}
                 <strong>{row.pick?.awayScore}</strong>
-                {row.pick?.penaltyWinner && <span> · pen. {teamLabel(row.pick.penaltyWinner)}</span>}
+                {row.pick?.homeScore === row.pick?.awayScore && row.pick?.penaltyWinner && (
+                  <span> · pen. {teamLabel(row.pick.penaltyWinner)}</span>
+                )}
               </td>
               <td>{row.points === undefined ? '-' : row.points}</td>
             </tr>

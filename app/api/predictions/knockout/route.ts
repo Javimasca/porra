@@ -121,7 +121,7 @@ export async function POST(request: Request) {
             matchId: match.matchId,
             homeScore: match.homeScore,
             awayScore: match.awayScore,
-            penaltyWinner: match.penaltyWinner || null,
+            penaltyWinner: match.homeScore === match.awayScore ? match.penaltyWinner || null : null,
           })),
         })
       }
