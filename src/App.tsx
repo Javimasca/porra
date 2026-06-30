@@ -1104,9 +1104,11 @@ const roundOf32PredictionStatus = useMemo(() => {
 
         const nextMatch = { ...item, [side]: parsedValue }
         const hasResult = nextMatch.homeScore !== undefined && nextMatch.awayScore !== undefined
+        const hasDraw = hasResult && nextMatch.homeScore === nextMatch.awayScore
 
         return {
           ...nextMatch,
+          penaltyWinner: hasDraw ? nextMatch.penaltyWinner : undefined,
           status: hasResult
             ? nextMatch.status === 'programado'
               ? 'en_juego'
@@ -1121,6 +1123,14 @@ const roundOf32PredictionStatus = useMemo(() => {
       ...current,
       matches: current.matches.map((item) => (
         item.id === matchId ? { ...item, status } : item
+      )),
+    }))
+  }
+  const updateOfficialPenaltyWinner = (matchId: string, penaltyWinner: string) => {
+    setTournamentState((current) => ({
+      ...current,
+      matches: current.matches.map((item) => (
+        item.id === matchId ? { ...item, penaltyWinner: penaltyWinner || undefined } : item
       )),
     }))
   }
@@ -3336,6 +3346,7 @@ setMatchPredictions((current) => {
                         key={match.id}
                         match={match}
                         onChange={updateOfficialMatchScore}
+                        onPenaltyWinnerChange={updateOfficialPenaltyWinner}
                         onStatusChange={updateOfficialMatchStatus}
                       />
                     ))}
@@ -3352,6 +3363,7 @@ setMatchPredictions((current) => {
                         displayAway={resolveKnockoutSlot(match.away, qualification)}
                         displayHome={resolveKnockoutSlot(match.home, qualification)}
                         onChange={updateOfficialMatchScore}
+                        onPenaltyWinnerChange={updateOfficialPenaltyWinner}
                         onStatusChange={updateOfficialMatchStatus}
                       />
                     ))}
@@ -3779,16 +3791,22 @@ function OfficialResultRow({
   displayHome,
   match,
   onChange,
+  onPenaltyWinnerChange,
   onStatusChange,
 }: {
   displayAway?: string
   displayHome?: string
   match: Match
   onChange: (matchId: string, side: 'homeScore' | 'awayScore', value: string) => void
+  onPenaltyWinnerChange: (matchId: string, penaltyWinner: string) => void
   onStatusChange: (matchId: string, status: Match['status']) => void
 }) {
   const homeTeam = displayHome ?? match.home
   const awayTeam = displayAway ?? match.away
+  const isDraw =
+    match.homeScore !== undefined &&
+    match.awayScore !== undefined &&
+    match.homeScore === match.awayScore
 
   return (
     <div className="official-result-row">
@@ -3819,6 +3837,17 @@ function OfficialResultRow({
         <option value="en_juego">En juego</option>
         <option value="finalizado">Finalizado</option>
       </select>
+      {isDraw && match.stage !== 'Grupo' && (
+        <select
+          aria-label={`Ganador por penaltis ${homeTeam} contra ${awayTeam}`}
+          onChange={(event) => onPenaltyWinnerChange(match.id, event.target.value)}
+          value={match.penaltyWinner ?? ''}
+        >
+          <option value="">Penaltis</option>
+          <option value={homeTeam}>{homeTeam}</option>
+          <option value={awayTeam}>{awayTeam}</option>
+        </select>
+      )}
     </div>
   )
 }
