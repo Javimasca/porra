@@ -614,7 +614,12 @@ if (!tournamentResponse.ok) {
   )
   const visibleTabs = mode === 'publico' ? publicTabs : adminTabs
   const closedPredictionStages = getClosedPredictionStages(predictionPhase)
-  const publicVisiblePredictions = publicPredictions.filter((prediction) => prediction.locked)
+  const publicVisiblePredictions = publicPredictions.filter((prediction) =>
+    prediction.matches.some((pick) => {
+      const match = resolvedTournamentState.matches.find((item) => item.id === pick.matchId)
+      return match ? closedPredictionStages.includes(match.stage) : false
+    }),
+  )
   const publicVisiblePredictionsByName = [...publicVisiblePredictions].sort((a, b) =>
     participantName(participants, a.participantId).localeCompare(participantName(participants, b.participantId)),
   )
@@ -660,7 +665,7 @@ if (!tournamentResponse.ok) {
   const mvpVariants = useMemo(() => buildNameVariants(predictions, 'mvp'), [predictions])
   const liveScoreNotice = hasLiveMatches ? <span className="live-score-notice">Incluye partidos en juego</span> : null
   useEffect(() => {
-    if (selectedPublicPredictionParticipantId || !publicParticipantPrediction?.locked) {
+    if (selectedPublicPredictionParticipantId || !publicParticipantPrediction) {
       return
     }
 
