@@ -215,11 +215,11 @@ function applyResolvedRoundOf32(state: TournamentState, qualification: ReturnTyp
   return {
     ...state,
     matches: state.matches.map((match) =>
-      match.stage === 'Ronda de 32'
+      match.stage !== 'Grupo'
         ? {
             ...match,
-            home: resolveKnockoutSlot(match.home, qualification) ?? match.home,
-            away: resolveKnockoutSlot(match.away, qualification) ?? match.away,
+            home: resolveKnockoutSlot(match.home, qualification, state.matches) ?? match.home,
+            away: resolveKnockoutSlot(match.away, qualification, state.matches) ?? match.away,
           }
         : match,
     ),
@@ -2518,8 +2518,8 @@ type="button"
                         <KnockoutCard
                           key={match.id}
                           match={match}
-                          resolvedAway={resolveKnockoutSlot(match.away, qualification)}
-                          resolvedHome={resolveKnockoutSlot(match.home, qualification)}
+                          resolvedAway={resolveKnockoutSlot(match.away, qualification, tournamentState.matches)}
+                          resolvedHome={resolveKnockoutSlot(match.home, qualification, tournamentState.matches)}
                         />
                       ))}
                   </div>
@@ -3372,8 +3372,8 @@ setMatchPredictions((current) => {
                       <OfficialResultRow
                         key={match.id}
                         match={match}
-                        displayAway={resolveKnockoutSlot(match.away, qualification)}
-                        displayHome={resolveKnockoutSlot(match.home, qualification)}
+                        displayAway={resolveKnockoutSlot(match.away, qualification, tournamentState.matches)}
+                        displayHome={resolveKnockoutSlot(match.home, qualification, tournamentState.matches)}
                         onChange={updateOfficialMatchScore}
                         onPenaltyWinnerChange={updateOfficialPenaltyWinner}
                         onStatusChange={updateOfficialMatchStatus}
@@ -4014,14 +4014,14 @@ function PredictionReview({
                     <h4>{stageLabel(stage)}</h4>
                     {stageMatches.map(({ match, matchPrediction }) => (
                       <div className="knockout-review-row" key={match.id}>
-                        <span>{teamLabel(resolveKnockoutSlot(match.home, qualification) ?? match.home)}</span>
+                        <span>{teamLabel(resolveKnockoutSlot(match.home, qualification, tournamentState.matches) ?? match.home)}</span>
                         <strong>
                           {matchPrediction.homeScore} - {matchPrediction.awayScore}
                         </strong>
-                        <span>{teamLabel(resolveKnockoutSlot(match.away, qualification) ?? match.away)}</span>
+                        <span>{teamLabel(resolveKnockoutSlot(match.away, qualification, tournamentState.matches) ?? match.away)}</span>
                         {matchPrediction.homeScore === matchPrediction.awayScore && matchPrediction.penaltyWinner && (
                           <span className="penalty-label">
-                            pen. {teamLabel(resolveKnockoutSlot(matchPrediction.penaltyWinner, qualification) ?? matchPrediction.penaltyWinner)}
+                            pen. {teamLabel(resolveKnockoutSlot(matchPrediction.penaltyWinner, qualification, tournamentState.matches) ?? matchPrediction.penaltyWinner)}
                           </span>
                         )}
                       </div>
@@ -4312,7 +4312,12 @@ function buildQualification(matches: Match[]) {
   }
 }
 
-function resolveKnockoutSlot(slot: string, qualification: ReturnType<typeof buildQualification>) {
+function resolveKnockoutSlot(
+  slot: string,
+  qualification: ReturnType<typeof buildQualification>,
+  matches?: Match[],
+  visitedMatchIds = new Set<string>(),
+) {
   const directMatch = slot.match(/^([12])([A-L])$/)
 
   if (directMatch) {
@@ -4327,7 +4332,48 @@ function resolveKnockoutSlot(slot: string, qualification: ReturnType<typeof buil
     return qualification.thirdAssignments[slot]
   }
 
+  const winnerMatch = slot.match(/^Ganador M(\d+)$/i)
+
+  if (winnerMatch && matches) {
+    const matchId = `m${winnerMatch[1]}`
+    if (visitedMatchIds.has(matchId)) {
+      return undefined
+    }
+
+    const sourceMatch = matches.find((match) => match.id.toLowerCase() === matchId.toLowerCase())
+    if (!sourceMatch) {
+      return undefined
+    }
+
+    return resolveMatchWinner(sourceMatch, qualification, matches, new Set([...visitedMatchIds, matchId]))
+  }
+
   return undefined
+}
+
+function resolveMatchWinner(
+  match: Match,
+  qualification: ReturnType<typeof buildQualification>,
+  matches: Match[],
+  visitedMatchIds: Set<string>,
+) {
+  if (
+    match.homeScore === undefined ||
+    match.awayScore === undefined ||
+    !liveScoreStatuses.has(match.status)
+  ) {
+    return undefined
+  }
+
+  const homeTeam = resolveKnockoutSlot(match.home, qualification, matches, visitedMatchIds) ?? match.home
+  const awayTeam = resolveKnockoutSlot(match.away, qualification, matches, visitedMatchIds) ?? match.away
+
+  if (match.homeScore > match.awayScore) return homeTeam
+  if (match.awayScore > match.homeScore) return awayTeam
+
+  return match.penaltyWinner
+    ? resolveKnockoutSlot(match.penaltyWinner, qualification, matches, visitedMatchIds) ?? match.penaltyWinner
+    : undefined
 }
 
 function assignThirdPlacedSlots(bestThirds: GroupTeamStanding[]) {
@@ -4605,8 +4651,8 @@ doc.text('Predicciones finales', 14, 85)
     let awayTeam = match.away
     
     if (match.stage !== 'Grupo' && match.stage !== 'Bonus') {
-      const resolvedHome = resolveKnockoutSlot(match.home, qualification)
-      const resolvedAway = resolveKnockoutSlot(match.away, qualification)
+      const resolvedHome = resolveKnockoutSlot(match.home, qualification, matches)
+      const resolvedAway = resolveKnockoutSlot(match.away, qualification, matches)
       homeTeam = resolvedHome || match.home
       awayTeam = resolvedAway || match.away
     }
@@ -4621,7 +4667,7 @@ doc.text('Predicciones finales', 14, 85)
       predictionMatch.homeScore === predictionMatch.awayScore &&
       predictionMatch.penaltyWinner
     ) {
-      const resolvedPenaltyWinner = resolveKnockoutSlot(predictionMatch.penaltyWinner, qualification)
+      const resolvedPenaltyWinner = resolveKnockoutSlot(predictionMatch.penaltyWinner, qualification, matches)
       scoreDisplay += ` (${resolvedPenaltyWinner ?? predictionMatch.penaltyWinner})`
     }
 
