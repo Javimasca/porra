@@ -320,7 +320,7 @@ function App() {
   const [selectedKnockoutParticipantId, setSelectedKnockoutParticipantId] = useState('')
   const [activeKnockoutStage, setActiveKnockoutStage] = useState<(typeof knockoutStages)[number]>('Ronda de 32')
   const [officialResultsStage, setOfficialResultsStage] = useState<Match['stage']>('Grupo')
-  const [showRoundOf32Pending, setShowRoundOf32Pending] = useState(false)
+  const [showCurrentKnockoutPending, setShowCurrentKnockoutPending] = useState(false)
   const [matchPredictions, setMatchPredictions] = useState<Record<string, MatchPrediction>>({})
   const [knockoutPredictions, setKnockoutPredictions] = useState<Record<string, MatchPrediction>>({})
   const [publicKnockoutPredictions, setPublicKnockoutPredictions] = useState<Record<string, MatchPrediction>>({})
@@ -714,13 +714,17 @@ const publicCurrentKnockoutComplete = Boolean(
   publicParticipantPrediction.locked &&
   hasCompleteStagePredictions(publicParticipantPrediction, resolvedTournamentState.matches, currentKnockoutStage),
 )
-const roundOf32PredictionStatus = useMemo(() => {
+const currentKnockoutPredictionStatus = useMemo(() => {
   const closed: Participant[] = []
   const pending: Participant[] = []
 
+  if (!currentKnockoutStage) {
+    return { closed, pending }
+  }
+
   validatedParticipants.forEach((participant) => {
     const prediction = predictions.find((item) => item.participantId === participant.id)
-    if (prediction?.locked && hasCompleteStagePredictions(prediction, resolvedTournamentState.matches, 'Ronda de 32')) {
+    if (prediction?.locked && hasCompleteStagePredictions(prediction, resolvedTournamentState.matches, currentKnockoutStage)) {
       closed.push(participant)
     } else {
       pending.push(participant)
@@ -731,7 +735,7 @@ const roundOf32PredictionStatus = useMemo(() => {
     closed,
     pending: sortParticipantsByName(pending),
   }
-}, [predictions, resolvedTournamentState.matches, validatedParticipants])
+}, [currentKnockoutStage, predictions, resolvedTournamentState.matches, validatedParticipants])
 
   useEffect(() => {
     let cancelled = false
@@ -2290,14 +2294,14 @@ type="button"
               <Metric label="Pagos pendientes" value={pendingPlayers.length.toString()} />
               <Metric label="Partidos cerrados" value={completedMatches.length.toString()} />
               <Metric label="Porras bloqueadas" value={lockedPredictions.length.toString()} />
-              <Metric label="Dieciseisavos cerradas" value={roundOf32PredictionStatus.closed.length.toString()} />
+              <Metric label={`${currentKnockoutStage ? stageLabel(currentKnockoutStage) : 'Eliminatoria'} cerradas`} value={currentKnockoutPredictionStatus.closed.length.toString()} />
               <button
                 className="metric metric-button"
-                onClick={() => setShowRoundOf32Pending((current) => !current)}
+                onClick={() => setShowCurrentKnockoutPending((current) => !current)}
                 type="button"
               >
-                <span>Dieciseisavos pendientes</span>
-                <strong>{roundOf32PredictionStatus.pending.length}</strong>
+                <span>{currentKnockoutStage ? stageLabel(currentKnockoutStage) : 'Eliminatoria'} pendientes</span>
+                <strong>{currentKnockoutPredictionStatus.pending.length}</strong>
               </button>
               <button
   className="metric metric-button"
@@ -2309,17 +2313,19 @@ type="button"
 </button>
             </section>
 
-            {showRoundOf32Pending && (
+            {showCurrentKnockoutPending && (
               <section className="panel pending-round-panel">
                 <div className="panel-title">
-                  <h3>Pendientes de dieciseisavos</h3>
-                  <span>{roundOf32PredictionStatus.pending.length} participantes</span>
+                  <h3>Pendientes de {currentKnockoutStage ? stageLabel(currentKnockoutStage).toLowerCase() : 'eliminatoria'}</h3>
+                  <span>{currentKnockoutPredictionStatus.pending.length} participantes</span>
                 </div>
-                {roundOf32PredictionStatus.pending.length === 0 ? (
+                {!currentKnockoutStage ? (
+                  <p>No hay una eliminatoria abierta.</p>
+                ) : currentKnockoutPredictionStatus.pending.length === 0 ? (
                   <p>Todos los participantes validados tienen cerrada la ronda.</p>
                 ) : (
                   <div className="pending-chip-list">
-                    {roundOf32PredictionStatus.pending.map((participant) => (
+                    {currentKnockoutPredictionStatus.pending.map((participant) => (
                       <button
                         className="pending-chip"
                         key={participant.id}
