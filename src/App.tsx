@@ -695,6 +695,19 @@ if (!tournamentResponse.ok) {
     (prediction) => prediction.participantId === selectedPredictionParticipantId,
   )
 const selectedPredictionIsLocked = selectedPrediction?.locked ?? false
+const selectedPredictionKnockoutRows = useMemo(() => {
+  if (!selectedPrediction) return []
+
+  return selectedPrediction.matches
+    .map((matchPrediction) => {
+      const match = tournamentState.matches.find((item) => item.id === matchPrediction.matchId)
+      return match ? { match, matchPrediction } : null
+    })
+    .filter(
+      (item): item is { match: Match; matchPrediction: MatchPrediction } =>
+        Boolean(item) && item.match.stage !== 'Grupo' && item.match.stage !== 'Bonus',
+    )
+}, [selectedPrediction, tournamentState.matches])
 
 const initialPredictionClosed = predictionPhase !== 'preGroups'
 
@@ -3112,6 +3125,45 @@ setMatchPredictions((current) => {
                 />
               ))}
             </div>
+            {selectedPrediction && (
+              <section className="review-section knockout-review-section">
+                <header className="subsection-header">
+                  <p className="eyebrow">Eliminatorias</p>
+                  <h3>Pronósticos guardados</h3>
+                </header>
+                {selectedPredictionKnockoutRows.length === 0 ? (
+                  <p className="muted-copy">Este participante no tiene pronósticos de eliminatorias guardados.</p>
+                ) : (
+                  knockoutStages.map((stage) => {
+                    const stageMatches = selectedPredictionKnockoutRows.filter(({ match }) => match.stage === stage)
+
+                    if (stageMatches.length === 0) {
+                      return null
+                    }
+
+                    return (
+                      <div className="knockout-review-stage" key={stage}>
+                        <h4>{stageLabel(stage)}</h4>
+                        {stageMatches.map(({ match, matchPrediction }) => (
+                          <div className="knockout-review-row" key={match.id}>
+                            <span>{teamLabel(resolveKnockoutSlot(match.home, qualification, tournamentState.matches) ?? match.home)}</span>
+                            <strong>
+                              {matchPrediction.homeScore} - {matchPrediction.awayScore}
+                            </strong>
+                            <span>{teamLabel(resolveKnockoutSlot(match.away, qualification, tournamentState.matches) ?? match.away)}</span>
+                            {matchPrediction.homeScore === matchPrediction.awayScore && matchPrediction.penaltyWinner && (
+                              <span className="penalty-label">
+                                pen. {teamLabel(resolveKnockoutSlot(matchPrediction.penaltyWinner, qualification, tournamentState.matches) ?? matchPrediction.penaltyWinner)}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })
+                )}
+              </section>
+            )}
           </section>
         )}
 
