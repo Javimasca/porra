@@ -170,6 +170,43 @@ describe('scorePrediction', () => {
     assert.equal(pointsFor('MVP', prediction, state), 25)
   })
 
+  it('derives semifinalist bonus from finished quarter-finals when no official list is stored', () => {
+    const state: TournamentState = {
+      semifinalists: [],
+      groupWinners: {},
+      groupQualified: {},
+      bestThirds: [],
+      matches: [
+        {
+          id: 'm97',
+          stage: 'Cuartos',
+          home: 'Spain',
+          away: 'Brazil',
+          homeScore: 2,
+          awayScore: 1,
+          status: 'finalizado',
+        },
+        {
+          id: 'm98',
+          stage: 'Cuartos',
+          home: 'Argentina',
+          away: 'France',
+          homeScore: 1,
+          awayScore: 1,
+          penaltyWinner: 'France',
+          status: 'finalizado',
+        },
+      ],
+    }
+
+    const prediction: PredictionSlip = {
+      ...basePrediction,
+      semifinalists: ['Spain', 'France', 'England', 'Germany'],
+    }
+
+    assert.equal(pointsFor('Semifinalistas', prediction, state), 8)
+  })
+
   it('returns points by match and positive bonuses', () => {
     const state: TournamentState = {
       champion: 'Spain',

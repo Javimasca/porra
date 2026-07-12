@@ -252,7 +252,28 @@ function scoreKnockoutSignBonuses(prediction: PredictionSlip, state: TournamentS
 }
 
 function scoreSemifinalists(prediction: PredictionSlip, state: TournamentState) {
-  const hits = state.semifinalists.filter((team) => prediction.semifinalists.includes(team)).length
+  const semifinalists = state.semifinalists.length > 0
+    ? state.semifinalists
+    : deriveSemifinalistsFromQuarterFinals(state.matches)
+  const hits = semifinalists.filter((team) => prediction.semifinalists.includes(team)).length
   const table = [0, 3, 8, 14, 20]
   return table[hits] ?? 0
+}
+
+function deriveSemifinalistsFromQuarterFinals(matches: Match[]) {
+  return matches
+    .filter((match) => match.stage === 'Cuartos' && match.status === 'finalizado')
+    .map(matchWinner)
+    .filter((winner): winner is string => Boolean(winner))
+}
+
+function matchWinner(match: Match) {
+  if (match.homeScore === undefined || match.awayScore === undefined) {
+    return undefined
+  }
+
+  if (match.homeScore > match.awayScore) return match.home
+  if (match.awayScore > match.homeScore) return match.away
+
+  return match.penaltyWinner
 }
