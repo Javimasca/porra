@@ -30,11 +30,12 @@ async function ensureSettingsTable(prisma: ReturnType<typeof getPrisma>) {
 async function readTournamentBonus(prisma: ReturnType<typeof getPrisma>) {
   await ensureSettingsTable(prisma)
   const rows = await prisma.$queryRaw<Array<{ key: string; value: string }>>`
-    SELECT key, value FROM app_settings WHERE key IN ('topScorer', 'mvp')
+    SELECT key, value FROM app_settings WHERE key IN ('champion', 'topScorer', 'mvp')
   `
   const settings = new Map(rows.map((row) => [row.key, row.value]))
 
   return {
+    champion: settings.get('champion') || undefined,
     topScorer: settings.get('topScorer') || undefined,
     mvp: settings.get('mvp') || undefined,
   }
@@ -254,6 +255,7 @@ export async function PUT(request: Request) {
 
     await ensureSettingsTable(prisma)
     await Promise.all([
+      saveSetting(prisma, 'champion', typeof state.champion === 'string' ? state.champion : ''),
       saveSetting(prisma, 'topScorer', typeof state.topScorer === 'string' ? state.topScorer : ''),
       saveSetting(prisma, 'mvp', typeof state.mvp === 'string' ? state.mvp : ''),
     ])

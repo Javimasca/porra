@@ -207,6 +207,62 @@ describe('scorePrediction', () => {
     assert.equal(pointsFor('Semifinalistas', prediction, state), 8)
   })
 
+  it('derives champion bonus from the finished final when no official champion is stored', () => {
+    const state: TournamentState = {
+      semifinalists: [],
+      groupWinners: {},
+      groupQualified: {},
+      bestThirds: [],
+      matches: [
+        {
+          id: 'm104',
+          stage: 'Final',
+          home: 'Spain',
+          away: 'Argentina',
+          homeScore: 1,
+          awayScore: 1,
+          penaltyWinner: 'Spain',
+          status: 'finalizado',
+        },
+      ],
+    }
+
+    const prediction: PredictionSlip = {
+      ...basePrediction,
+      champion: 'Spain',
+    }
+
+    assert.equal(pointsFor('Campeon', prediction, state), 40)
+  })
+
+  it('uses the stored official champion before deriving it from the final', () => {
+    const state: TournamentState = {
+      champion: 'Argentina',
+      semifinalists: [],
+      groupWinners: {},
+      groupQualified: {},
+      bestThirds: [],
+      matches: [
+        {
+          id: 'm104',
+          stage: 'Final',
+          home: 'Spain',
+          away: 'Argentina',
+          homeScore: 2,
+          awayScore: 0,
+          status: 'finalizado',
+        },
+      ],
+    }
+
+    const prediction: PredictionSlip = {
+      ...basePrediction,
+      champion: 'Argentina',
+    }
+
+    assert.equal(pointsFor('Campeon', prediction, state), 40)
+  })
+
   it('returns points by match and positive bonuses', () => {
     const state: TournamentState = {
       champion: 'Spain',

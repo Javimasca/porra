@@ -114,6 +114,8 @@ export function scorePrediction(prediction: PredictionSlip, state: TournamentSta
     return sum + (pick ? scoreKnockoutMatch(pick, match) : 0)
   }, 0)
 
+  const champion = state.champion || deriveChampionFromFinal(state.matches)
+
   return [
     { label: 'Partidos de grupo', points: groupMatchPoints },
     { label: 'Plenos de grupo', points: scoreGroupSignPerfects(prediction, state) },
@@ -123,7 +125,7 @@ export function scorePrediction(prediction: PredictionSlip, state: TournamentSta
     { label: 'Eliminatorias', points: knockoutPoints },
     { label: 'Bonus eliminatorias', points: scoreKnockoutSignBonuses(prediction, state) },
     { label: 'Semifinalistas', points: scoreSemifinalists(prediction, state) },
-    { label: 'Campeon', points: state.champion && prediction.champion === state.champion ? 40 : 0 },
+    { label: 'Campeon', points: champion && prediction.champion === champion ? 40 : 0 },
     { label: 'Goleador', points: nameMatchesAny(prediction.topScorer, state.topScorer) ? 25 : 0 },
     { label: 'MVP', points: nameMatches(prediction.mvp, state.mvp) ? 25 : 0 },
   ]
@@ -265,6 +267,11 @@ function deriveSemifinalistsFromQuarterFinals(matches: Match[]) {
     .filter((match) => match.stage === 'Cuartos' && match.status === 'finalizado')
     .map(matchWinner)
     .filter((winner): winner is string => Boolean(winner))
+}
+
+function deriveChampionFromFinal(matches: Match[]) {
+  const final = matches.find((match) => match.stage === 'Final' && match.status === 'finalizado')
+  return final ? matchWinner(final) : undefined
 }
 
 function matchWinner(match: Match) {

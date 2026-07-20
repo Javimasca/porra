@@ -416,6 +416,7 @@ if (!tournamentResponse.ok) {
         if (Array.isArray(apiTournament.matches)) {
           setTournamentState({
             ...initialTournamentState,
+            champion: typeof apiTournament.champion === 'string' ? apiTournament.champion : undefined,
             topScorer: typeof apiTournament.topScorer === 'string' ? apiTournament.topScorer : undefined,
             mvp: typeof apiTournament.mvp === 'string' ? apiTournament.mvp : undefined,
             matches: apiTournament.matches.map(normalizeMatch),
@@ -1110,6 +1111,7 @@ const currentKnockoutPredictionStatus = useMemo(() => {
 
     setTournamentState({
       ...tournamentState,
+      champion: typeof saved.data.champion === 'string' ? saved.data.champion : tournamentState.champion,
       topScorer: typeof saved.data.topScorer === 'string' ? saved.data.topScorer : tournamentState.topScorer,
       mvp: typeof saved.data.mvp === 'string' ? saved.data.mvp : tournamentState.mvp,
       matches: savedMatches.map(normalizeMatch),
@@ -3471,6 +3473,14 @@ setMatchPredictions((current) => {
                   <span>aplican a la clasificacion</span>
                 </div>
                 <div className="meta-grid">
+                  <TeamSelect
+                    label="Campeon"
+                    onChange={(value) => {
+                      setTournamentState((current) => ({ ...current, champion: value || undefined }))
+                    }}
+                    teams={allTeams}
+                    value={tournamentState.champion ?? ''}
+                  />
                   <label>
                     Maximo goleador/es
                     <input
